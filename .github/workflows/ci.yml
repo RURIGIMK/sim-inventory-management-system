@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop", "feature/**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate project
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore backend
+        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
+        run: dotnet restore
+
+      - name: Build backend
+        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test backend
+        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
+        run: dotnet test --configuration Release --no-build
+
+      - name: Setup Node.js
+        if: ${{ hashFiles('src/frontend/package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        if: ${{ hashFiles('src/frontend/package.json') != '' }}
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Validate frontend
+        if: ${{ hashFiles('src/frontend/package.json') != '' }}
+        working-directory: src/frontend
+        run: npm run lint
+
+      - name: Test frontend
+        if: ${{ hashFiles('src/frontend/package.json') != '' }}
+        working-directory: src/frontend
+        run: npm test -- --runInBand
+
+      - name: Build frontend
+        if: ${{ hashFiles('src/frontend/package.json') != '' }}
+        working-directory: src/frontend
+        run: npm run build
+
+      - name: Repository structure check
+        run: |
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Commit: $GITHUB_SHA"
+          echo "CI validation completed."
