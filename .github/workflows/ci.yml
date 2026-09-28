@@ -19,22 +19,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET
-        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
+        if: ${{ hashFiles('src/backend/**/*.csproj', 'tests/**/*.csproj') != '' }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
       - name: Restore backend
         if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
-        run: dotnet restore
+        run: dotnet restore src/backend/SimInventory.Api/SimInventory.Api.csproj
 
       - name: Build backend
         if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build src/backend/SimInventory.Api/SimInventory.Api.csproj --configuration Release --no-restore
 
       - name: Test backend
-        if: ${{ hashFiles('src/backend/**/*.csproj') != '' }}
-        run: dotnet test --configuration Release --no-build
+        if: ${{ hashFiles('tests/**/*.csproj') != '' }}
+        run: dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj --configuration Release
 
       - name: Setup Node.js
         if: ${{ hashFiles('src/frontend/package.json') != '' }}
