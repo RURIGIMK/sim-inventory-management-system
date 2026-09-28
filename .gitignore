@@ -1,0 +1,33 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+coverage/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/build output
+TestResults/
+dist/
+
+# Secrets and local databases
+*.db
+*.sqlite
+*.sqlite3
