@@ -76,7 +76,7 @@ export default function Home() {
       planType: form.planType,
       monthlyCost: Number(form.monthlyCost),
       costCentre: form.costCentre.trim(),
-      status: "Available"
+      status: "Available" as const
     };
     if (mode === "api") {
       setSaving(true);
