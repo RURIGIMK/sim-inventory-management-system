@@ -133,3 +133,83 @@ The repository supports the project described in the proposal and Chapters 1–3
 ## Current Limitation
 
 The GitHub repository is being populated incrementally. A README, CI foundation and development/data documentation do not by themselves constitute the completed application. Implementation evidence should only be described as completed after the corresponding source code, tests and commits exist in the repository.
+
+
+## Current working slice
+
+The repository now contains an initial end-to-end development slice:
+- A Next.js inventory screen with search, status filters, summary metrics and a SIM registration form.
+- Synthetic demo records so the UI can be reviewed without a running backend. Demo-mode changes remain in memory only.
+- An ASP.NET Core API with `GET /api/health`, `GET /api/sims` and `POST /api/sims`.
+- PostgreSQL persistence through EF Core. In Development, the API uses `EnsureCreated` to create the initial schema when the database is available.
+- Initial xUnit model tests and a GitHub Actions CI workflow.
+
+The allocation lifecycle, authentication/RBAC, audit log, full reports, frontend automated tests and production deployment remain future work. Do not present them as implemented.
+
+## Run locally (Windows PowerShell)
+
+Prerequisites: Git, .NET 8 SDK, Node.js 20+, npm, and Docker Desktop.
+
+1. Clone the repository and enter the project:
+
+   ```powershell
+   git clone https://github.com/RURIGIMK/sim-inventory-management-system.git
+   cd sim-inventory-management-system
+   git pull origin main
+   ```
+
+2. Start PostgreSQL using Docker Desktop:
+
+   ```powershell
+   docker compose up -d postgres
+   docker compose ps
+   ```
+
+   The development database is `sim_inventory`, user `postgres`, password `change-me`. These are local development credentials only. Do not reuse them in production.
+
+3. Start the API in a first PowerShell terminal:
+
+   ```powershell
+   cd src/backend/SimInventory.Api
+   dotnet restore
+   dotnet run --urls http://localhost:5080
+   ```
+
+   Open `http://localhost:5080/api/health`. The API creates the initial development schema on startup. Swagger is available at `http://localhost:5080/swagger` when the environment is Development.
+
+4. Start the frontend in a second PowerShell terminal, from the repository root:
+
+   ```powershell
+   cd src/frontend
+   Copy-Item .env.example .env.local
+   npm install
+   npm run dev
+   ```
+
+   Open `http://localhost:3000`. The frontend reads `NEXT_PUBLIC_API_BASE_URL=http://localhost:5080` from `.env.local`.
+
+5. Check the integrated workflow:
+   - Confirm the connection indicator says **Connected to API**.
+   - Select **Register SIM** and enter a unique phone number, ICCID and cost centre.
+   - Save the record, then confirm it appears in the inventory table.
+   - Try registering the same ICCID or phone number again. The API should reject the duplicate.
+   - Use search and the status filter to inspect the inventory.
+   - If the API/database is unavailable, the interface switches to synthetic demo mode. Changes made in that mode are not saved to PostgreSQL.
+
+6. Run the backend tests in another terminal:
+
+   ```powershell
+   dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj
+   ```
+
+7. Stop the local database when finished:
+
+   ```powershell
+   docker compose down
+   ```
+
+   To also delete the local database volume and its data, use `docker compose down -v`. Do not run that command if you need to keep your local test records.
+
+## Visual direction
+
+The interface uses a restrained red, near-black, white and neutral-grey palette informed by public Kenya Airways visual references. The interface intentionally contains no airline logo or name. The red is an approximate public-reference value, not a claim to reproduce an official internal design system.
