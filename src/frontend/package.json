@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit",
-    "test": "node -e \"console.log('No frontend test suite configured yet')\""
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "next": "14.2.31",
