@@ -172,6 +172,7 @@ Prerequisites: Git, .NET 8 SDK, Node.js 20+, npm, and Docker Desktop.
    ```powershell
    cd src/backend/SimInventory.Api
    dotnet restore
+   $env:ASPNETCORE_ENVIRONMENT = "Development"
    dotnet run --urls http://localhost:5080
    ```
 
