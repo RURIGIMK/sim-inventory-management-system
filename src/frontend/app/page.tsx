@@ -16,6 +16,31 @@ type Sim = {
 };
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
+
+const statusNames = ["Available", "Allocated", "Suspended", "Deactivated"] as const;
+
+function normalizeStatus(value: unknown): Sim["status"] {
+  if (typeof value === "number") return statusNames[value] ?? "Available";
+  if (typeof value === "string") {
+    const match = statusNames.find(item => item.toLowerCase() === value.toLowerCase());
+    if (match) return match;
+  }
+  return "Available";
+}
+
+function normalizeSim(value: Record<string, unknown>): Sim {
+  return {
+    ...value,
+    id: Number(value.id ?? 0),
+    operator: String(value.operator ?? ""),
+    phoneNumber: String(value.phoneNumber ?? ""),
+    iccid: String(value.iccid ?? ""),
+    planType: String(value.planType ?? ""),
+    monthlyCost: Number(value.monthlyCost ?? 0),
+    status: normalizeStatus(value.status),
+    costCentre: String(value.costCentre ?? "")
+  } as Sim;
+}
 const sample: Sim[] = [
   { id: 101, operator: "Safaricom", phoneNumber: "254700000101", iccid: "893100000000000101", planType: "Corporate voice + data", monthlyCost: 2400, status: "Allocated", costCentre: "OPS-014" },
   { id: 102, operator: "Airtel", phoneNumber: "254730000102", iccid: "893100000000000102", planType: "Data bundle", monthlyCost: 1500, status: "Available", costCentre: "IT-002" },
@@ -41,7 +66,7 @@ export default function Home() {
       if (!response.ok) throw new Error("API returned " + response.status);
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Unexpected API response");
-      setSims(data);
+      setSims(data.map((item: unknown) => normalizeSim(item as Record<string, unknown>)));
       setMode("api");
       setConnection("Connected to API");
     } catch {
