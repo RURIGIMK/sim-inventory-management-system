@@ -47,7 +47,7 @@ jobs:
       - name: Install frontend dependencies
         if: ${{ hashFiles('src/frontend/package.json') != '' }}
         working-directory: src/frontend
-        run: npm ci
+        run: npm install
 
       - name: Validate frontend
         if: ${{ hashFiles('src/frontend/package.json') != '' }}
@@ -57,7 +57,7 @@ jobs:
       - name: Test frontend
         if: ${{ hashFiles('src/frontend/package.json') != '' }}
         working-directory: src/frontend
-        run: npm test -- --runInBand
+        run: npm test
 
       - name: Build frontend
         if: ${{ hashFiles('src/frontend/package.json') != '' }}
