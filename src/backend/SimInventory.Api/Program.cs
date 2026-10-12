@@ -5,6 +5,8 @@ using SimInventory.Api.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options => options.AddPolicy("LocalFrontend", policy =>
+    policy.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -15,6 +17,15 @@ builder.Services.AddDbContext<SimInventoryDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 var app = builder.Build();
+
+app.UseCors("LocalFrontend");
+
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<SimInventoryDbContext>();
+    await db.Database.EnsureCreatedAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {
