@@ -2,20 +2,22 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OtpNet;
 using SimInventory.Api.Models;
 
 namespace SimInventory.Api.Security;
 
-public sealed class TokenService(IConfiguration configuration)
+public sealed class TokenService(IConfiguration configuration, IHostEnvironment environment)
 {
     public string CreateToken(AppUser user, string stage = "session", int minutes = 60)
     {
-        var key = configuration["Authentication:JwtSigningKey"]
-            ?? throw new InvalidOperationException("Authentication:JwtSigningKey is required.");
-        if (Encoding.UTF8.GetByteCount(key) < 32)
-            throw new InvalidOperationException("Authentication:JwtSigningKey must be at least 32 bytes.");
+        var key = configuration["Authentication:JwtSigningKey"];
+        if (string.IsNullOrWhiteSpace(key) && environment.IsDevelopment())
+            key = "LOCAL-ONLY-DO-NOT-USE-IN-PRODUCTION-KEY-CHANGE-ME-123456789";
+        if (string.IsNullOrWhiteSpace(key) || Encoding.UTF8.GetByteCount(key) < 32)
+            throw new InvalidOperationException("Set Authentication:JwtSigningKey to a random value of at least 32 bytes.");
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -38,12 +40,15 @@ public sealed class TokenService(IConfiguration configuration)
     }
 }
 
-public sealed class TotpSecretProtector(IConfiguration configuration)
+public sealed class TotpSecretProtector(IConfiguration configuration, IHostEnvironment environment)
 {
     private byte[] GetKey()
     {
-        var encoded = configuration["Authentication:MfaEncryptionKey"]
-            ?? throw new InvalidOperationException("Authentication:MfaEncryptionKey is required.");
+        var encoded = configuration["Authentication:MfaEncryptionKey"];
+        if (string.IsNullOrWhiteSpace(encoded) && environment.IsDevelopment())
+            encoded = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes("LOCAL-ONLY-MFA-KEY-DO-NOT-USE-IN-PRODUCTION")));
+        if (string.IsNullOrWhiteSpace(encoded))
+            throw new InvalidOperationException("Set Authentication:MfaEncryptionKey to a base64-encoded 32-byte key.");
         var key = Convert.FromBase64String(encoded);
         if (key.Length != 32)
             throw new InvalidOperationException("Authentication:MfaEncryptionKey must decode to exactly 32 bytes.");
@@ -84,8 +89,7 @@ public static class TotpHelper
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length != 6 || !code.All(char.IsDigit)) return false;
         var bytes = Base32Encoding.ToBytes(secret);
-        var totp = new Totp(bytes);
-        return totp.VerifyTotp(code, out _, new VerificationWindow(previous: 1, future: 1));
+        return new Totp(bytes).VerifyTotp(code, out _, new VerificationWindow(previous: 1, future: 1));
     }
 
     public static string SetupUri(string email, string secret) =>
