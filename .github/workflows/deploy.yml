@@ -60,6 +60,25 @@ jobs:
           npm run lint
           npm run build
 
+      - name: Verify deployed API health
+        env:
+          RENDER_API_BASE_URL: ${{ vars.RENDER_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          api_base="${RENDER_API_BASE_URL%/}"
+          for attempt in $(seq 1 60); do
+            status="$(curl --silent --output /tmp/sim-api-health.json --write-out '%{http_code}' --max-time 10 "$api_base/api/health" || true)"
+            if [ "$status" = "200" ] && grep -q '"status":"ok"' /tmp/sim-api-health.json; then
+              echo "API health check passed."
+              cat /tmp/sim-api-health.json
+              exit 0
+            fi
+            echo "API health check attempt $attempt/60 did not pass (HTTP ${status:-unknown}); waiting 10 seconds."
+            sleep 10
+          done
+          echo "API did not become healthy within 10 minutes. Frontend deployment is blocked." >&2
+          exit 1
+
       - name: Deploy static frontend to Cloudflare Pages
         working-directory: src/frontend
         env:
