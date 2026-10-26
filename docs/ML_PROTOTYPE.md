@@ -1,5 +1,7 @@
 # Optional SIM Asset Intelligence Prototype
 
+Runnable example: [notebooks/sim_cost_anomaly_demo.ipynb](../notebooks/sim_cost_anomaly_demo.ipynb). Open it in Google Colab and run each cell. It generates synthetic costs locally and exports a review CSV.
+
 Machine learning is a separate proof of concept, not required for the core inventory system. Do not use real employee or operator data in Colab unless explicit authorization and an approved data-handling plan exist.
 
 ## Proposed experiments
