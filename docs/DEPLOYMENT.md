@@ -28,7 +28,7 @@ The prototype currently uses EF Core `EnsureCreatedAsync`. Before any production
 2. Add `http://localhost:3000` and the final Cloudflare Pages URL as Authorized JavaScript origins.
 3. Configure `Authentication__GoogleClientId` in Render and `GOOGLE_OAUTH_CLIENT_ID` as a GitHub Actions secret for frontend builds.
 4. Set `Authentication__BootstrapAdminEmail` in Render to the exact Google email for the first administrator.
-5. The first sign-in creates that administrator only when no matching account exists and the database has no matching user. All other users must be provisioned by an administrator.
+5. The first sign-in creates that administrator only when the database has no user records. After bootstrap, all other users must be provisioned by an administrator.
 6. After Google verifies identity, the API emails a six-digit OTP. Codes expire in five minutes and are limited to five attempts.
 
 ## Email OTP provider
