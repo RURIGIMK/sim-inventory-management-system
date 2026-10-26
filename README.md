@@ -103,6 +103,7 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by
 - [Security design and limitations](docs/SECURITY.md)
 - [Deployment and environment setup](docs/DEPLOYMENT.md)
 - [Optional synthetic-data ML experiment](docs/ML_PROTOTYPE.md)
+- [Colab notebook: synthetic cost anomaly experiment](notebooks/sim_cost_anomaly_demo.ipynb)
 - [Testing notes](docs/TESTING.md)
 
 ## Important limitations before production
