@@ -20,3 +20,4 @@ public sealed class Employee
 }
 
 public sealed record CreateEmployeeRequest(string EmployeeNumber, string FullName, string? Email, string Department, string CostCentre);
+public sealed record UpdateEmployeeStatusRequest(EmploymentStatus Status);
