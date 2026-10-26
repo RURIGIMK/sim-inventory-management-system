@@ -73,6 +73,6 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 
 ## Known non-goals / remaining work
 
-- This change set establishes secure account access, basic SIM inventory protection, account administration, audit event storage, deployment scaffolding and planning documents.
-- Full employee directory, allocation/return/reassignment workflow, reporting exports, comprehensive audit-chain verification UI, rate limiting, CSRF/XSS hardening, versioned database migrations, backups and formal privacy/security review remain required before a production pilot.
+- The current branch includes employee directory CRUD/status management, SIM allocation/return/reassignment, a basic audit viewer and hash-chain verification, account administration, authentication rate limiting and deployment scaffolding.
+- Reporting exports, broader automated business-rule/security tests, secure HttpOnly session cookies, full XSS/CSRF review, reviewed versioned database migrations, backups/restore drills and formal privacy/security review remain required before a production pilot.
 - Machine learning remains an optional experiment and must not be represented as a deployed capability.
