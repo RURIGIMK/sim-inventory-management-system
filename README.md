@@ -1,216 +1,116 @@
 # SIM Inventory Management System
 
-## An Integrated Framework for Proactive SIM Inventory Management, Allocation, Tracking, and Audit Compliance
+A web-based system for organizational SIM asset tracking, employee assignment, lifecycle management and audit visibility. This is an academic prototype and is not approved for production use with real employee or SIM data.
 
-A web-based information system proposed for organizational management of Subscriber Identity Module (SIM) assets. The project focuses on centralized SIM inventory, allocation tracking, role-based access control, auditability, and reporting.
+## Current architecture
 
-> Project status: Academic capstone project under development. The repository is being prepared incrementally alongside implementation.
-
-## Project Context
-
-Organizations may manage SIM cards through spreadsheets, paper records, or disconnected processes. This project proposes a centralized web application that provides a structured record of SIM assets and their lifecycle.
-
-The system is designed around three main layers:
-
-1. Presentation layer: Next.js and TypeScript
-2. Application layer: ASP.NET Core Web API
-3. Data layer: PostgreSQL
-
-## Planned Core Features
-
-- User authentication and role-based access control
-- SIM registration and inventory management
-- SIM allocation, reassignment, return, and deactivation
-- Allocation history
-- Audit logging of significant state-changing actions
-- Dashboard summaries and operational reporting
-- User and role administration
-- Filtering and export of management information
-- Database-backed validation and integrity constraints
-
-## Planned User Roles
-
-| Role | Purpose |
+| Layer | Technology |
 | --- | --- |
-| Administrator | User management, SIM administration, allocation and audit oversight |
-| Departmental Manager | SIM allocation, reassignment, operational management and reporting |
-| Viewer | Read-only access to permitted inventory and reporting information |
-
-## Technology Stack
-
-| Area | Technology |
-| --- | --- |
-| Frontend | Next.js, TypeScript, Tailwind CSS |
-| Backend | ASP.NET Core Web API, C# |
+| Frontend | Next.js 14, React, TypeScript, static export |
+| API | ASP.NET Core 8 / C# |
 | ORM | Entity Framework Core |
-| Database | PostgreSQL |
-| API testing | Postman |
-| Backend testing | xUnit |
-| Frontend testing | Jest, React Testing Library |
-| Version control | Git and GitHub |
-| CI | GitHub Actions |
+| Hosted database | Neon PostgreSQL |
+| Local database | Docker PostgreSQL |
+| Authentication | Google sign-in for administrator-provisioned accounts |
+| MFA | Authenticator-app TOTP |
+| Authorization | API-enforced Administrator, Departmental Manager and Viewer roles |
+| CI | GitHub Actions build, type-check and test |
+| CD | Gated GitHub Actions deployment to Cloud Run and Cloudflare Pages |
+| Optional ML research | Google Colab using synthetic data only |
 
-## Data / Dataset
+## Implemented in this branch
 
-This is an information-system project rather than a machine-learning project, so there is no model-training dataset.
+- Google ID-token validation and email matching against provisioned application accounts.
+- One-time bootstrap administrator configured through environment variables.
+- Required authenticator-app MFA, with TOTP secrets encrypted at rest.
+- Administrator UI and APIs to create accounts, change roles, disable or re-enable accounts.
+- Backend role authorization and disabled-account checks on authenticated requests.
+- SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
+- Employee directory APIs and interface, with administrator-managed employee records and status.
+- SIM allocation, return and reassignment APIs and interface, preserving assignment history.
+- Hash-linked audit events and an administrator-only audit verification endpoint.
+- GitHub Actions CI workflow and gated deployment workflow.
+- Cloud Run Dockerfile, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
-Development uses synthetic test/seed records representing SIM inventory, operators, users, allocations and audit activity. Synthetic data is appropriate for development because real employee identifiers, phone numbers and SIM credentials should not be committed to a public repository.
+Check the open pull request and GitHub Actions before treating this branch as validated. No successful CI result is claimed until Actions reports green.
 
-The sample data is documented under the data directory.
+## Local development
 
-## Repository Structure
+Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 
-The intended structure is:
+1. Start PostgreSQL:
 
-    sim-inventory-management-system/
-    ├── .github/
-    │   └── workflows/
-    │       └── ci.yml
-    ├── data/
-    │   ├── README.md
-    │   └── sample_sims.csv
-    ├── docs/
-    │   ├── AI_ASSISTANCE.md
-    │   └── DEVELOPMENT.md
-    ├── src/
-    │   ├── backend/
-    │   └── frontend/
-    ├── tests/
-    ├── .gitignore
-    └── README.md
+       docker compose up -d postgres
 
-The application source will be added as implementation progresses. The CI workflow is deliberately written to support the planned backend/frontend structure without claiming that components already exist.
+2. Start the API from the repository root:
 
-## Development Workflow
+       cd src/backend/SimInventory.Api
+       dotnet restore
+       dotnet run
 
-The project uses Git for version control. Changes should be committed in small, meaningful units.
+   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey` and `Authentication__MfaEncryptionKey` as environment variables. The code contains clearly marked development-only fallback signing/encryption keys, but Google sign-in still needs a valid OAuth client ID.
 
-Example commit sequence:
+3. In another terminal, configure and run the frontend:
 
-    docs: add project README
-    ci: add GitHub Actions validation workflow
-    data: add synthetic SIM seed dataset
-    docs: document development workflow
-    feat: implement SIM registration API
-    feat: implement SIM allocation workflow
-    test: add allocation service tests
+       cd src/frontend
+       npm install
+       npm run dev
 
-This makes the development history easier to inspect and explain during project review.
+   Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:5080` if that is the API URL reported by your local launch profile, and set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the same Google Web OAuth client ID used by the API.
 
-## Continuous Integration
+4. Open `http://localhost:3000/login`. Sign in using the configured bootstrap administrator Google account. Complete authenticator enrolment. Then use User administration to provision each additional account.
 
-GitHub Actions is configured in .github/workflows/ci.yml.
+The API uses `EnsureCreatedAsync` for this early prototype. Before production, replace it with versioned EF Core migrations and a reviewed deployment migration process.
 
-The pipeline is intended to:
+## Roles
 
-1. Trigger on pushes and pull requests.
-2. Restore and build the .NET backend when the backend project exists.
-3. Install and validate the Next.js frontend when the frontend project exists.
-4. Run automated tests when the corresponding test projects/scripts exist.
-5. Fail the workflow when a configured build or test step fails.
+| Role | Access |
+| --- | --- |
+| Administrator | Provision and manage accounts, manage employee records, manage SIMs, manage allocations, review and verify audit trail |
+| Departmental Manager | View employees and SIMs, register SIMs, allocate, return and reassign SIMs |
+| Viewer | Read-only SIM, employee and allocation views |
 
-This is CI, not machine-learning automation. The project does not currently require an ML pipeline because machine-learning model training is outside the stated project scope.
+New accounts should normally be created as Viewer and elevated only when justified. The API prevents self-disable/self-demotion and protects the last active administrator.
 
-## Security and Data Handling
+## Core API routes
 
-- Do not commit real employee personal information.
-- Do not commit real SIM credentials, secrets, database passwords or API keys.
-- Store environment-specific secrets using GitHub Actions secrets or local environment variables.
-- Passwords must be stored using secure password hashing through the chosen authentication framework.
-- Authorization should be enforced by the backend rather than relying only on frontend visibility.
+| Method | Route | Access |
+| --- | --- | --- |
+| POST | `/api/auth/google` | Public, validates Google ID token and starts MFA |
+| POST | `/api/auth/mfa/setup` | MFA setup challenge |
+| POST | `/api/auth/otp` | MFA challenge |
+| GET | `/api/auth/me` | Authenticated session |
+| GET / POST | `/api/admin/users` | Administrator |
+| PUT | `/api/admin/users/{id}` | Administrator |
+| GET / POST | `/api/employees`, `/api/admin/employees` | Authenticated read / administrator write |
+| PUT | `/api/admin/employees/{id}/status` | Administrator |
+| GET / POST | `/api/sims` | Authenticated read / manager or administrator write |
+| GET / POST | `/api/allocations` | Authenticated read / manager or administrator write |
+| POST | `/api/allocations/{id}/return` | Manager or administrator |
+| POST | `/api/allocations/{id}/reassign` | Manager or administrator |
+| GET | `/api/admin/audit` | Administrator |
+| GET | `/api/admin/audit/verify` | Administrator |
 
-## Academic Alignment
+## Data handling
 
-The repository supports the project described in the proposal and Chapters 1–3:
+Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, MFA encryption keys, access tokens or actual organizational data.
 
-- Problem: fragmented/manual SIM asset management.
-- Objective: develop a web-based system for SIM tracking, allocation and audit.
-- Methodology: iterative/prototyping-oriented development.
-- Architecture: three-tier web architecture.
-- Evaluation: functional, integration, system and black-box testing.
-- Deliverables: web application, source repository, database schema, evaluation evidence and documentation.
+## Deployment
 
-## Current Limitation
+Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by the `DEPLOY_ENABLED` repository variable and requires secrets and variables for Google Cloud Workload Identity Federation, Cloud Run, Neon and Cloudflare Pages.
 
-The GitHub repository is being populated incrementally. A README, CI foundation and development/data documentation do not by themselves constitute the completed application. Implementation evidence should only be described as completed after the corresponding source code, tests and commits exist in the repository.
+- [Technical specification and acceptance criteria](docs/TECHNICAL_SPECIFICATION.md)
+- [Security design and limitations](docs/SECURITY.md)
+- [Deployment and environment setup](docs/DEPLOYMENT.md)
+- [Optional synthetic-data ML experiment](docs/ML_PROTOTYPE.md)
+- [Colab notebook: synthetic cost anomaly experiment](notebooks/sim_cost_anomaly_demo.ipynb)
+- [Testing notes](docs/TESTING.md)
 
+## Important limitations before production
 
-## Current working slice
-
-The repository now contains an initial end-to-end development slice:
-- A Next.js inventory screen with search, status filters, summary metrics and a SIM registration form.
-- Synthetic demo records so the UI can be reviewed without a running backend. Demo-mode changes remain in memory only.
-- An ASP.NET Core API with `GET /api/health`, `GET /api/sims` and `POST /api/sims`.
-- PostgreSQL persistence through EF Core. In Development, the API uses `EnsureCreated` to create the initial schema when the database is available.
-- Initial xUnit model tests and a GitHub Actions CI workflow.
-
-The allocation lifecycle, authentication/RBAC, audit log, full reports, frontend automated tests and production deployment remain future work. Do not present them as implemented.
-
-## Run locally (Windows PowerShell)
-
-Prerequisites: Git, .NET 8 SDK, Node.js 20+, npm, and Docker Desktop.
-
-1. Clone the repository and enter the project:
-
-   ```powershell
-   git clone https://github.com/RURIGIMK/sim-inventory-management-system.git
-   cd sim-inventory-management-system
-   git pull origin main
-   ```
-
-2. Start PostgreSQL using Docker Desktop:
-
-   ```powershell
-   docker compose up -d postgres
-   docker compose ps
-   ```
-
-   The development database is `sim_inventory`, user `postgres`, password `change-me`. These are local development credentials only. Do not reuse them in production.
-
-3. Start the API in a first PowerShell terminal:
-
-   ```powershell
-   cd src/backend/SimInventory.Api
-   dotnet restore
-   $env:ASPNETCORE_ENVIRONMENT = "Development"
-   dotnet run --urls http://localhost:5080
-   ```
-
-   Open `http://localhost:5080/api/health`. The API creates the initial development schema on startup. Swagger is available at `http://localhost:5080/swagger` when the environment is Development.
-
-4. Start the frontend in a second PowerShell terminal, from the repository root:
-
-   ```powershell
-   cd src/frontend
-   Copy-Item .env.example .env.local
-   npm install
-   npm run dev
-   ```
-
-   Open `http://localhost:3000`. The frontend reads `NEXT_PUBLIC_API_BASE_URL=http://localhost:5080` from `.env.local`.
-
-5. Check the integrated workflow:
-   - Confirm the connection indicator says **Connected to API**.
-   - Select **Register SIM** and enter a unique phone number, ICCID and cost centre.
-   - Save the record, then confirm it appears in the inventory table.
-   - Try registering the same ICCID or phone number again. The API should reject the duplicate.
-   - Use search and the status filter to inspect the inventory.
-   - If the API/database is unavailable, the interface switches to synthetic demo mode. Changes made in that mode are not saved to PostgreSQL.
-
-6. Run the backend tests in another terminal:
-
-   ```powershell
-   dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj
-   ```
-
-7. Stop the local database when finished:
-
-   ```powershell
-   docker compose down
-   ```
-
-   To also delete the local database volume and its data, use `docker compose down -v`. Do not run that command if you need to keep your local test records.
-
-## Visual direction
-
-The interface uses a restrained red, near-black, white and neutral-grey palette informed by public Kenya Airways visual references. The interface intentionally contains no airline logo or name. The red is an approximate public-reference value, not a claim to reproduce an official internal design system.
+- Use reviewed, versioned database migrations instead of startup schema creation.
+- Add secure HttpOnly session cookies, rate limiting, monitoring and a formal XSS/CSRF review.
+- Configure and test database backups, restore, data retention and access controls.
+- Hash-linked audit events are tamper-evident, not absolutely immutable. Add restricted database permissions and independent append-only archival for a real deployment.
+- Obtain written authorization and complete privacy/security reviews before importing organizational data.
+- Confirm current free-tier limits and potential charges. Cloud provider free tiers are not guaranteed to remain permanently free.

@@ -61,8 +61,18 @@ export default function Home() {
   const [form, setForm] = useState({ operator: "Safaricom", phoneNumber: "", iccid: "", planType: "Corporate voice + data", monthlyCost: "1500", costCentre: "" });
 
   const loadSims = useCallback(async () => {
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("simAccessToken") : null;
+    if (!token) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
     try {
-      const response = await fetch(API + "/api/sims", { cache: "no-store" });
+      const response = await fetch(API + "/api/sims", { cache: "no-store", headers: { Authorization: "Bearer " + token } });
+      if (response.status === 401) {
+        sessionStorage.removeItem("simAccessToken");
+        window.location.href = "/login";
+        return;
+      }
       if (!response.ok) throw new Error("API returned " + response.status);
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Unexpected API response");
@@ -108,7 +118,7 @@ export default function Home() {
       try {
         const response = await fetch(API + "/api/sims", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + (sessionStorage.getItem("simAccessToken") || "") },
           body: JSON.stringify(newSim)
         });
         if (response.status === 409) throw new Error("A SIM with that ICCID or phone number already exists.");
@@ -145,8 +155,10 @@ export default function Home() {
         <nav aria-label="Main navigation">
           <a className="nav-item selected" href="#inventory"><span className="nav-symbol">▦</span> Inventory <span className="nav-count">{sims.length}</span></a>
           <a className="nav-item" href="#overview"><span className="nav-symbol">◫</span> Overview</a>
-          <a className="nav-item disabled" href="#allocation" onClick={e => { e.preventDefault(); setNotice("Allocation workflow is planned and not yet implemented."); }}><span className="nav-symbol">⇄</span> Allocations</a>
-          <a className="nav-item disabled" href="#audit" onClick={e => { e.preventDefault(); setNotice("Audit log is planned and not yet implemented."); }}><span className="nav-symbol">≡</span> Audit log</a>
+          <a className="nav-item" href="/employees"><span className="nav-symbol">♙</span> Employees</a>
+          <a className="nav-item" href="/allocations"><span className="nav-symbol">⇄</span> Allocations</a>
+          <a className="nav-item" href="/admin"><span className="nav-symbol">⚙</span> User administration</a>
+          <a className="nav-item" href="/audit"><span className="nav-symbol">≡</span> Audit log</a>
           <a className="nav-item disabled" href="#reports" onClick={e => { e.preventDefault(); setNotice("Reporting is planned and not yet implemented."); }}><span className="nav-symbol">▤</span> Reports</a>
         </nav>
         <div className="sidebar-bottom"><span className="status-led" /> Development environment <small>Version 0.1.0</small></div>
@@ -155,7 +167,7 @@ export default function Home() {
       <section className="main-panel">
         <header className="topbar">
           <div className="breadcrumbs">Workspace <span>/</span> <strong>Inventory</strong></div>
-          <div className="topbar-right"><span className={mode === "api" ? "connection good" : "connection"}><i />{connection}</span><button className="avatar" aria-label="Current user">RK</button></div>
+          <div className="topbar-right"><span className={mode === "api" ? "connection good" : "connection"}><i />{connection}</span><button className="avatar" aria-label="Sign out" title="Sign out" onClick={() => { sessionStorage.removeItem("simAccessToken"); window.location.href = "/login"; }}>↗</button></div>
         </header>
         <div className="content">
           <section className="page-heading" id="overview">
