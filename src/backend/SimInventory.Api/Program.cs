@@ -233,7 +233,7 @@ app.MapPost("/api/auth/google", async (
 
     var now = DateTimeOffset.UtcNow;
     if (user.EmailOtpCodeHash is not null && user.EmailOtpSentAt is not null &&
-        now - user.EmailOtpSentAt < TimeSpan.FromSeconds(60))
+        now - user.EmailOtpSentAt.Value < TimeSpan.FromSeconds(60))
         return Results.Json(new { message = "A code was sent recently. Wait one minute before requesting another." },
             statusCode: StatusCodes.Status429TooManyRequests);
 
