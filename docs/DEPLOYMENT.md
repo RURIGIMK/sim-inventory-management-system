@@ -56,7 +56,6 @@ Set these under repository Settings > Secrets and variables > Actions > Variable
 - `CLOUD_RUN_SERVICE`: service name, for example `sim-inventory-api`.
 - `CLOUDFLARE_PAGES_PROJECT`: existing Pages project name.
 - `CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins, without a trailing slash.
-- `NEXT_PUBLIC_API_BASE_URL`: deployed Cloud Run API base URL, without a trailing slash.
 
 Generate secrets locally rather than inventing values or committing them:
 
@@ -70,7 +69,7 @@ The workflow uses Google Workload Identity Federation rather than a long-lived s
 1. Merge reviewed changes to `main). CI runs on pull requests and pushes.
 2. Configure the secrets and variables above.
 3. Set `DEPLOY_ENABLED=true` only after the API URL, OAuth origins and CORS origin are correct.
-4. Run the `Deploy` workflow manually once to validate the setup.
+4. Run the `Deploy` workflow manually once to validate the setup. The workflow deploys the API first, discovers its Cloud Run URL, then injects that URL into the frontend build. You do not need to guess or preconfigure the API URL.
 5. Subsequent pushes to `main` deploy automatically while `DEPLOY_ENABLED=true`.
 
 Cloud Run's first deployment may need a manual one-time bootstrap for API enablement, Workload Identity Federation, service-account permissions and the Cloud Run service identity. Those actions require the project owner's Google Cloud and Cloudflare accounts.
