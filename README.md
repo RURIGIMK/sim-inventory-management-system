@@ -20,14 +20,14 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 
 ## Implemented capabilities
 
-- Google ID-token validation and email matching against provisioned application accounts.
+- Google ID-token validation and email matching against provisioned application accounts.\n- Auditable rejection reasons for invalid Google credentials, unprovisioned accounts and disabled accounts, without storing submitted credentials.
 - One-time bootstrap administrator configured through environment variables.
 - Administrator UI and APIs to create accounts, change roles, disable or re-enable accounts.
 - Backend role authorization and disabled-account checks on authenticated requests.
 - SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
 - Employee directory APIs and interface, with administrator-managed employee records and status.
 - SIM allocation, return and reassignment APIs and interface, preserving assignment history.
-- Hash-linked audit events and an administrator-only audit verification endpoint.\n- Explainable SIM Asset Intelligence alerts for unusual same-operator costs, contract dates and inventory consistency, with human-review guidance.
+- Hash-linked audit events, timestamp-stable SHA-256 verification and an administrator-only audit verification endpoint.\n- Explainable SIM Asset Intelligence alerts for unusual same-operator costs, contract dates and inventory consistency, with human-review guidance.
 - GitHub Actions CI workflow and gated deployment workflow.
 - Render Docker deployment, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
