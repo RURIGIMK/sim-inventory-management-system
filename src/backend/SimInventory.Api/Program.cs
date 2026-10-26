@@ -471,8 +471,8 @@ app.MapGet("/api/admin/audit/verify", async (SimInventoryDbContext db) =>
     var previous = "GENESIS";
     foreach (var entry in events)
     {
-        var canonical = $"{previous}|{entry.CreatedAt:O}|{entry.ActorEmail}|{entry.Action}|{entry.EntityType}|{entry.EntityId}|{entry.Details}";
-        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+        var expected = AuditHash.ComputeHash(previous, entry.CreatedAt, entry.ActorEmail,
+            entry.Action, entry.EntityType, entry.EntityId, entry.Details);
         if (entry.PreviousHash != previous || entry.Hash != expected)
             return Results.Ok(new { valid = false, checkedEvents = entry.Id - 1, firstInvalidEventId = entry.Id });
         previous = entry.Hash;
