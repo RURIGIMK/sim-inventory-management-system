@@ -186,6 +186,10 @@ app.MapPost("/api/auth/google", async (
     }
     catch (Exception)
     {
+        // Record the rejected attempt without persisting the submitted credential.
+        await AuditWriter.WriteAsync(db, new ClaimsPrincipal(), "login_rejected_invalid_google_token",
+            "auth", "google", "{\"reason\":\"token_validation_failed\"}");
+        await db.SaveChangesAsync();
         return Results.Unauthorized();
     }
 
@@ -198,8 +202,17 @@ app.MapPost("/api/auth/google", async (
     {
         var bootstrapEmail = configuration["Authentication:BootstrapAdminEmail"]?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(bootstrapEmail) || email != bootstrapEmail || await db.Users.AnyAsync())
+        {
+            var deniedActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.Email, email)
+            }));
+            await AuditWriter.WriteAsync(db, deniedActor, "login_rejected_unprovisioned", "auth", email,
+                "{\"reason\":\"account_not_provisioned\"}");
+            await db.SaveChangesAsync();
             return Results.Json(new { message = "This Google account has not been provisioned. Ask an administrator to create it." },
                 statusCode: StatusCodes.Status403Forbidden);
+        }
 
         user = new AppUser
         {
@@ -214,8 +227,17 @@ app.MapPost("/api/auth/google", async (
     }
 
     if (!user.IsActive)
+    {
+        var deniedActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Email, email)
+        }));
+        await AuditWriter.WriteAsync(db, deniedActor, "login_rejected_disabled", "auth", user.Id.ToString(),
+            "{\"reason\":\"account_disabled\"}");
+        await db.SaveChangesAsync();
         return Results.Json(new { message = "This account has been disabled. Contact an administrator." },
             statusCode: StatusCodes.Status403Forbidden);
+    }
 
     var auditActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
     {
