@@ -9,6 +9,8 @@ public class SimInventoryDbContext(DbContextOptions<SimInventoryDbContext> optio
     public DbSet<Sim> Sims => Set<Sim>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<SimAssignment> Assignments => Set<SimAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +40,26 @@ public class SimInventoryDbContext(DbContextOptions<SimInventoryDbContext> optio
             entity.Property(x => x.EntityId).HasMaxLength(200);
             entity.Property(x => x.Hash).HasMaxLength(64);
             entity.Property(x => x.PreviousHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<Employee>(entity =>
+        {
+            entity.HasIndex(x => x.EmployeeNumber).IsUnique();
+            entity.Property(x => x.EmployeeNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(320);
+            entity.Property(x => x.Department).HasMaxLength(120);
+            entity.Property(x => x.CostCentre).HasMaxLength(80);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<SimAssignment>(entity =>
+        {
+            entity.HasOne(x => x.Sim).WithMany().HasForeignKey(x => x.SimId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Employee).WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SimId).IsUnique().HasFilter("\"ReturnedAt\" IS NULL");
+            entity.HasIndex(x => x.EmployeeId);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
         });
     }
 }
