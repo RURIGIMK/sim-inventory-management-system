@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SimInventory.Api.Data;
 using SimInventory.Api.Models;
+using SimInventory.Api.Intelligence;
 using SimInventory.Api.Security;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -185,6 +186,10 @@ app.MapPost("/api/auth/google", async (
     }
     catch (Exception)
     {
+        // Record the rejected attempt without persisting the submitted credential.
+        await AuditWriter.WriteAsync(db, new ClaimsPrincipal(), "login_rejected_invalid_google_token",
+            "auth", "google", "{\"reason\":\"token_validation_failed\"}");
+        await db.SaveChangesAsync();
         return Results.Unauthorized();
     }
 
@@ -197,8 +202,17 @@ app.MapPost("/api/auth/google", async (
     {
         var bootstrapEmail = configuration["Authentication:BootstrapAdminEmail"]?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(bootstrapEmail) || email != bootstrapEmail || await db.Users.AnyAsync())
+        {
+            var deniedActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.Email, email)
+            }));
+            await AuditWriter.WriteAsync(db, deniedActor, "login_rejected_unprovisioned", "auth", email,
+                "{\"reason\":\"account_not_provisioned\"}");
+            await db.SaveChangesAsync();
             return Results.Json(new { message = "This Google account has not been provisioned. Ask an administrator to create it." },
                 statusCode: StatusCodes.Status403Forbidden);
+        }
 
         user = new AppUser
         {
@@ -213,8 +227,17 @@ app.MapPost("/api/auth/google", async (
     }
 
     if (!user.IsActive)
+    {
+        var deniedActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Email, email)
+        }));
+        await AuditWriter.WriteAsync(db, deniedActor, "login_rejected_disabled", "auth", user.Id.ToString(),
+            "{\"reason\":\"account_disabled\"}");
+        await db.SaveChangesAsync();
         return Results.Json(new { message = "This account has been disabled. Contact an administrator." },
             statusCode: StatusCodes.Status403Forbidden);
+    }
 
     var auditActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
     {
@@ -289,6 +312,15 @@ app.MapGet("/api/admin/audit", async (SimInventoryDbContext db) =>
         .Select(x => new { x.Id, x.ActorEmail, x.Action, x.EntityType, x.EntityId, x.Details, x.CreatedAt, x.PreviousHash, x.Hash })
         .ToListAsync())).RequireAuthorization("Administrators");
 
+app.MapGet("/api/intelligence/alerts", async (SimInventoryDbContext db) =>
+{
+    var sims = await db.Sims.AsNoTracking().ToListAsync();
+    var assignments = await db.Assignments.AsNoTracking().ToListAsync();
+    var employees = await db.Employees.AsNoTracking().ToListAsync();
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    return Results.Ok(SimAssetIntelligence.Evaluate(sims, assignments, employees, today));
+}).RequireAuthorization("Session");
+
 app.MapGet("/api/sims", async (SimInventoryDbContext db) =>
     Results.Ok(await db.Sims.AsNoTracking().OrderBy(x => x.Id).ToListAsync()))
     .RequireAuthorization("Session");
@@ -311,7 +343,7 @@ app.MapPost("/api/sims", async (Sim sim, ClaimsPrincipal principal, SimInventory
     db.Sims.Add(sim);
     await db.SaveChangesAsync();
     await AuditWriter.WriteAsync(db, principal, "sim_registered", "sim", sim.Id.ToString(),
-        System.Text.Json.JsonSerializer.Serialize(new { sim.Iccid, sim.PhoneNumber, sim.Operator }));
+        System.Text.Json.JsonSerializer.Serialize(new { sim.Operator, sim.PlanType, sim.CostCentre }));
     await db.SaveChangesAsync();
     return Results.Created($"/api/sims/{sim.Id}", sim);
 }).RequireAuthorization("Managers");
@@ -439,8 +471,8 @@ app.MapGet("/api/admin/audit/verify", async (SimInventoryDbContext db) =>
     var previous = "GENESIS";
     foreach (var entry in events)
     {
-        var canonical = $"{previous}|{entry.CreatedAt:O}|{entry.ActorEmail}|{entry.Action}|{entry.EntityType}|{entry.EntityId}|{entry.Details}";
-        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+        var expected = AuditHash.ComputeHash(previous, entry.CreatedAt, entry.ActorEmail,
+            entry.Action, entry.EntityType, entry.EntityId, entry.Details);
         if (entry.PreviousHash != previous || entry.Hash != expected)
             return Results.Ok(new { valid = false, checkedEvents = entry.Id - 1, firstInvalidEventId = entry.Id });
         previous = entry.Hash;

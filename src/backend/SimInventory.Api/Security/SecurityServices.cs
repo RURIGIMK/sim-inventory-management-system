@@ -40,6 +40,25 @@ public sealed class TokenService(IConfiguration configuration, IHostEnvironment 
 }
 
 
+public static class AuditHash
+{
+    // PostgreSQL timestamptz stores microsecond precision. Normalize before hashing
+    // so the timestamp used to create the hash survives a database round trip.
+    public static DateTimeOffset NormalizeTimestamp(DateTimeOffset value)
+    {
+        var utcTicks = value.UtcDateTime.Ticks;
+        return new DateTimeOffset(utcTicks - utcTicks % 10, TimeSpan.Zero);
+    }
+
+    public static string ComputeHash(string previousHash, DateTimeOffset createdAt,
+        string actorEmail, string action, string entityType, string entityId, string details)
+    {
+        var stableTimestamp = NormalizeTimestamp(createdAt);
+        var canonical = $"{previousHash}|{stableTimestamp:O}|{actorEmail}|{action}|{entityType}|{entityId}|{details}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+    }
+}
+
 public static class AuditWriter
 {
     public static async Task WriteAsync(SimInventory.Api.Data.SimInventoryDbContext db,
@@ -49,9 +68,8 @@ public static class AuditWriter
         var email = actor.FindFirstValue(ClaimTypes.Email) ?? "system";
         var actorIdValue = actor.FindFirstValue(ClaimTypes.NameIdentifier);
         Guid? actorId = Guid.TryParse(actorIdValue, out var parsed) ? parsed : null;
-        var created = DateTimeOffset.UtcNow;
-        var canonical = $"{previous}|{created:O}|{email}|{action}|{entityType}|{entityId}|{details}";
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+        var created = AuditHash.NormalizeTimestamp(DateTimeOffset.UtcNow);
+        var hash = AuditHash.ComputeHash(previous, created, email, action, entityType, entityId, details);
         db.AuditEvents.Add(new AuditEvent
         {
             ActorUserId = actorId, ActorEmail = email, Action = action, EntityType = entityType,

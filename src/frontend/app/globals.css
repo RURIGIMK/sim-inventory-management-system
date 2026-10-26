@@ -136,3 +136,33 @@ tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#fdfdfd}
 .audit-table{min-width:1000px}
 .audit-table code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;white-space:normal;overflow-wrap:anywhere;max-width:260px;display:block}
 @media(max-width:760px){.audit-summary{align-items:flex-start;flex-direction:column}}
+
+.intelligence-note{border:1px solid #e3e5e8;border-left:3px solid var(--accent);background:#fff;padding:15px 17px;border-radius:6px;margin:0 0 18px}
+.intelligence-note strong{display:block;font-family:Manrope,sans-serif;font-size:13px;margin-bottom:6px}
+.intelligence-note p{margin:0;color:#646a73;font-size:12px;line-height:1.7}
+.intelligence-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.intelligence-metric{display:grid;gap:10px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:17px}
+.intelligence-metric span{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:#777c85;font-weight:700}
+.intelligence-metric strong{font-family:Manrope,sans-serif;font-size:27px;letter-spacing:-.7px}
+.intelligence-list{display:grid;gap:12px;padding:0 20px 18px}
+.intelligence-alert{border:1px solid var(--line);border-radius:6px;padding:16px;background:#fff}
+.intelligence-alert-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.intelligence-alert h3{font-family:Manrope,sans-serif;font-size:14px;margin:8px 0 0;letter-spacing:-.2px}
+.intelligence-alert>p{font-size:12px;line-height:1.65;color:#626771;margin:10px 0}
+.intelligence-severity{display:inline-block;border-radius:4px;padding:4px 7px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+.intelligence-severity.high{background:var(--red-bg);color:var(--red)}
+.intelligence-severity.medium{background:var(--amber-bg);color:var(--amber)}
+.intelligence-severity.low{background:#edf1f5;color:#536171}
+.intelligence-code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;color:#8a8e96;overflow-wrap:anywhere;text-align:right}
+.intelligence-entity{font-size:10px!important;letter-spacing:.3px;font-weight:700;color:#767b84!important}
+.intelligence-values{display:flex;gap:20px;flex-wrap:wrap;padding:10px 12px;background:#f7f8f9;border-radius:5px;font-size:11px;color:#626771}
+.intelligence-values strong{display:block;color:#24272d;margin-top:4px;font-size:13px}
+.intelligence-contract{font-size:11px!important}
+.intelligence-action{border-top:1px solid #eff0f2;margin-top:12px;padding-top:12px}
+.intelligence-action strong{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#777c85}
+.intelligence-action p{margin:6px 0 0;font-size:12px;line-height:1.65;color:#333840}
+.intelligence-empty{padding:30px 22px;text-align:center}
+.intelligence-empty strong{font-family:Manrope,sans-serif;font-size:14px}
+.intelligence-empty p{font-size:12px;color:#777c85;line-height:1.7;margin:9px auto 0;max-width:520px}
+@media(max-width:700px){.intelligence-metrics{grid-template-columns:1fr}.intelligence-alert-top{flex-direction:column}.intelligence-code{text-align:left}}
+

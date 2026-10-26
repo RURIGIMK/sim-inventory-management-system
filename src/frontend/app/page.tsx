@@ -159,6 +159,7 @@ export default function Home() {
           <a className="nav-item" href="/allocations"><span className="nav-symbol">⇄</span> Allocations</a>
           <a className="nav-item" href="/admin"><span className="nav-symbol">⚙</span> User administration</a>
           <a className="nav-item" href="/audit"><span className="nav-symbol">≡</span> Audit log</a>
+          <a className="nav-item" href="/intelligence"><span className="nav-symbol">⌁</span> Asset intelligence</a>
           <a className="nav-item disabled" href="#reports" onClick={e => { e.preventDefault(); setNotice("Reporting is planned and not yet implemented."); }}><span className="nav-symbol">▤</span> Reports</a>
         </nav>
         <div className="sidebar-bottom"><span className="status-led" /> Development environment <small>Version 0.1.0</small></div>
