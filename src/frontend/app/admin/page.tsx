@@ -14,9 +14,12 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const authHeaders = useCallback(() => {
+  const authHeaders = useCallback((): Record<string, string> => {
     const token = sessionStorage.getItem("simAccessToken");
-    if (!token) { window.location.href = "/login"; return {}; }
+    if (!token) {
+      window.location.href = "/login";
+      return { "Content-Type": "application/json" };
+    }
     return { Authorization: "Bearer " + token, "Content-Type": "application/json" };
   }, []);
 
