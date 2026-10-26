@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
-type User = { id: string; email: string; displayName: string; role: "Administrator" | "DepartmentalManager" | "Viewer"; isActive: boolean; totpEnabled: boolean; createdAt: string };
+type User = { id: string; email: string; displayName: string; role: "Administrator" | "DepartmentalManager" | "Viewer"; isActive: boolean; createdAt: string };
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -84,12 +84,11 @@ export default function AdminUsersPage() {
     </section>
     <section className="admin-panel">
       <h2>Existing accounts</h2>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>MFA</th><th>Actions</th></tr></thead>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>{users.map(user => <tr key={user.id}>
           <td><strong>{user.displayName}</strong><small>{user.email}</small></td>
           <td><select aria-label={"Role for " + user.email} value={user.role} onChange={e => void updateUser(user, e.target.value as User["role"], user.isActive)}><option value="Viewer">Viewer</option><option value="DepartmentalManager">Departmental Manager</option><option value="Administrator">Administrator</option></select></td>
           <td><span className={user.isActive ? "account-active" : "account-disabled"}>{user.isActive ? "Active" : "Disabled"}</span></td>
-          <td>{user.totpEnabled ? "Enabled" : "Pending"}</td>
           <td><button className="text-button" onClick={() => void updateUser(user, user.role, !user.isActive)}>{user.isActive ? "Disable" : "Enable"}</button></td>
         </tr>)}</tbody>
       </table></div>
