@@ -48,7 +48,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
        dotnet restore
        dotnet run
 
-   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The API requires an email provider API key and sender address to send codes. Google sign-in still needs a valid OAuth client ID.
+   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Authentication__EmailOtpSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The API requires an email provider API key and sender address to send codes. Google sign-in still needs a valid OAuth client ID.
 
 3. In another terminal, configure and run the frontend:
 
