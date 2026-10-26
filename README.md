@@ -6,7 +6,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 14, React, TypeScript, static export |
+| Frontend | Next.js 15, React 19, TypeScript, static export |
 | API | ASP.NET Core 8 / C# |
 | ORM | Entity Framework Core |
 | Hosted database | Neon PostgreSQL |
@@ -27,7 +27,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
 - Employee directory APIs and interface, with administrator-managed employee records and status.
 - SIM allocation, return and reassignment APIs and interface, preserving assignment history.
-- Hash-linked audit events and an administrator-only audit verification endpoint.
+- Hash-linked audit events and an administrator-only audit verification endpoint.\n- Explainable SIM Asset Intelligence alerts for unusual same-operator costs, contract dates and inventory consistency, with human-review guidance.
 - GitHub Actions CI workflow and gated deployment workflow.
 - Render Docker deployment, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
@@ -86,7 +86,7 @@ New accounts should normally be created as Viewer and elevated only when justifi
 | POST | `/api/allocations/{id}/return` | Manager or administrator |
 | POST | `/api/allocations/{id}/reassign` | Manager or administrator |
 | GET | `/api/admin/audit` | Administrator |
-| GET | `/api/admin/audit/verify` | Administrator |
+| GET | `/api/admin/audit/verify` | Administrator |\n| GET | `/api/intelligence/alerts` | Authenticated session |
 
 ## Data handling
 
