@@ -112,11 +112,12 @@ public static class SimAssetIntelligence
         }
 
         var costComparisonsSkipped = 0;
-        foreach (var sim in sims.Where(x => x.MonthlyCost >= 0))
+        foreach (var sim in sims.Where(x => x.MonthlyCost >= 0 && x.Status != SimStatus.Deactivated))
         {
             var peers = sims
                 .Where(other => other.Id != sim.Id &&
                     other.MonthlyCost >= 0 &&
+                    other.Status != SimStatus.Deactivated &&
                     string.Equals(other.Operator.Trim(), sim.Operator.Trim(), StringComparison.OrdinalIgnoreCase))
                 .Select(other => other.MonthlyCost)
                 .OrderBy(value => value)
@@ -129,6 +130,12 @@ public static class SimAssetIntelligence
             }
 
             var median = Median(peers);
+            if (median <= 0m)
+            {
+                costComparisonsSkipped++;
+                continue;
+            }
+
             var deviations = peers.Select(value => Math.Abs(value - median)).OrderBy(value => value).ToArray();
             var mad = Median(deviations);
             var threshold = median + Math.Max(3m * 1.4826m * mad, Math.Abs(median) * 0.5m);
