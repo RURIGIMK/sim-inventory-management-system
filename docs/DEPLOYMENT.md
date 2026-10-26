@@ -58,6 +58,11 @@ Set these under repository Settings > Secrets and variables > Actions > Variable
 - `CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins, without a trailing slash.
 - `NEXT_PUBLIC_API_BASE_URL`: deployed Cloud Run API base URL, without a trailing slash.
 
+Generate secrets locally rather than inventing values or committing them:
+
+- JWT signing key: `openssl rand -hex 32` (store the output as `JWT_SIGNING_KEY`).
+- MFA encryption key: `openssl rand -base64 32` (store the output as `MFA_ENCRYPTION_KEY`).
+
 The workflow uses Google Workload Identity Federation rather than a long-lived service-account JSON key. Configure the provider to trust only this repository and the intended branch/environment, and grant only the permissions needed for Cloud Run deployment and Cloud Build.
 
 ## Deploy sequence
