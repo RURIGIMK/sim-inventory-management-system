@@ -166,6 +166,10 @@ using (var scope = app.Services.CreateScope())
         CREATE INDEX IF NOT EXISTS "IX_AuditEvents_CreatedAt" ON "AuditEvents" ("CreatedAt");
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_AuditEvents_Hash" ON "AuditEvents" ("Hash");
         """);
+
+    // Seed a repeatable synthetic directory and available SIM pool for demonstrations.
+    // Existing records and allocations are preserved.
+    await DemoDataSeeder.SeedAsync(db);
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "sim-inventory-api" }));
@@ -353,42 +357,6 @@ app.MapGet("/api/employees", async (SimInventoryDbContext db) =>
     Results.Ok(await db.Employees.AsNoTracking().OrderBy(x => x.EmployeeNumber)
         .Select(x => new { x.Id, x.EmployeeNumber, x.FullName, x.Email, x.Department, x.CostCentre, status = x.Status.ToString() })
         .ToListAsync())).RequireAuthorization("Session");
-
-app.MapPost("/api/admin/employees", async (CreateEmployeeRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
-{
-    if (string.IsNullOrWhiteSpace(request.EmployeeNumber) || string.IsNullOrWhiteSpace(request.FullName) ||
-        string.IsNullOrWhiteSpace(request.Department) || string.IsNullOrWhiteSpace(request.CostCentre))
-        return Results.BadRequest(new { message = "Employee number, full name, department and cost centre are required." });
-    var employeeNumber = request.EmployeeNumber.Trim();
-    if (await db.Employees.AnyAsync(x => x.EmployeeNumber == employeeNumber))
-        return Results.Conflict(new { message = "An employee with this employee number already exists." });
-    var employee = new Employee
-    {
-        EmployeeNumber = employeeNumber, FullName = request.FullName.Trim(),
-        Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim().ToLowerInvariant(),
-        Department = request.Department.Trim(), CostCentre = request.CostCentre.Trim(), Status = EmploymentStatus.Active
-    };
-    db.Employees.Add(employee);
-    await AuditWriter.WriteAsync(db, principal, "employee_created", "employee", employee.Id.ToString(),
-        System.Text.Json.JsonSerializer.Serialize(new { employee.EmployeeNumber, employee.Department, employee.CostCentre }));
-    await db.SaveChangesAsync();
-    return Results.Created($"/api/employees/{employee.Id}", new { employee.Id, employee.EmployeeNumber, employee.FullName, employee.Department, employee.CostCentre, status = employee.Status.ToString() });
-}).RequireAuthorization("Administrators");
-
-app.MapPut("/api/admin/employees/{id:int}/status", async (int id, UpdateEmployeeStatusRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
-{
-    if (!Enum.IsDefined(request.Status)) return Results.BadRequest(new { message = "Invalid employment status." });
-    var employee = await db.Employees.SingleOrDefaultAsync(x => x.Id == id);
-    if (employee is null) return Results.NotFound();
-    if (request.Status != EmploymentStatus.Active && await db.Assignments.AnyAsync(x => x.EmployeeId == id && x.ReturnedAt == null))
-        return Results.Conflict(new { message = "Return all currently assigned SIMs before deactivating or terminating this employee." });
-    var before = employee.Status.ToString();
-    employee.Status = request.Status;
-    await AuditWriter.WriteAsync(db, principal, "employee_status_changed", "employee", employee.Id.ToString(),
-        System.Text.Json.JsonSerializer.Serialize(new { before, after = request.Status.ToString() }));
-    await db.SaveChangesAsync();
-    return Results.Ok(new { employee.Id, status = employee.Status.ToString() });
-}).RequireAuthorization("Administrators");
 
 app.MapGet("/api/allocations", async (SimInventoryDbContext db) =>
     Results.Ok(await db.Assignments.AsNoTracking().Include(x => x.Sim).Include(x => x.Employee)
