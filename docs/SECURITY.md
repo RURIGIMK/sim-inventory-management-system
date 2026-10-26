@@ -41,4 +41,4 @@ Before production, strengthen the design with database roles that deny applicati
 - Only synthetic data is allowed in public repository examples and automated tests.
 - Do not import employee records or live operator usage/billing information without written authorization, a defined purpose, data minimization, access controls, retention rules and a privacy assessment.
 - Never put authentication tokens, phone numbers, ICCIDs or personal information in logs.
-- Use HTTPS, strict CORS origins, input validation, rate limiting on sign-in and OTP endpoints, and monitoring before production.
+- The API applies a basic fixed-window rate limit to Google sign-in and OTP endpoints. Before production, review per-client throttling behind the host proxy, alerting, lockout/recovery policy, monitoring, strict CORS origins and additional abuse protections.
