@@ -6,7 +6,6 @@
 - Sign-in uses Google Identity Services. The backend validates the Google ID token, audience and verified email.
 - Google identity is matched to the exact normalized email already provisioned in the application.
 - A configured bootstrap administrator is the sole exception needed to establish the first administrator.
-- Every sign-in requires a fresh email OTP after Google identity verification.
 - Roles are stored in PostgreSQL, not source code. Administrators can create accounts, change roles, disable or re-enable accounts without editing source.
 - API authorization is enforced server-side. Hiding a frontend control is not a security boundary.
 - The API checks account status on authenticated requests, so disabled users are rejected even if they still possess an unexpired token.
@@ -22,14 +21,12 @@
 
 Expand this matrix as allocation approvals, reporting and employee management are implemented. Default new accounts to Viewer.
 
-## Email OTP and secret storage
+## Session signing and account access
 
-- Email OTP codes are six digits and expire after five minutes.
-- Only an HMAC-SHA256 hash of the code is stored. The raw code is sent through the configured email provider and is not persisted.
-- A code is single-use and has a maximum of five verification attempts.
-- JWT signing and email OTP signing keys must be independent, random secrets of at least 32 bytes and must not be committed to Git.
-- The JWT key has a development-only fallback. Email OTP requires its own configured signing key and an email provider. Never run production with development fallbacks.
-- The frontend stores the short-lived application token in sessionStorage. This reduces persistence after closing the tab but does not eliminate XSS risk. Add a secure, HttpOnly, SameSite cookie-based session before production use.
+- Only the JWT signing key is required for application sessions. Configure a random secret of at least 32 bytes outside source control.
+- The backend validates the Google ID token, verified email and OAuth audience, then checks the normalized email against the approved account list.
+- A valid Google identity without an active approved account is denied access.
+- The JWT key has a development-only fallback. Never run a production deployment with development fallbacks.
 
 ## Audit trail
 
@@ -42,4 +39,4 @@ Before production, strengthen the design with database roles that deny applicati
 - Only synthetic data is allowed in public repository examples and automated tests.
 - Do not import employee records or live operator usage/billing information without written authorization, a defined purpose, data minimization, access controls, retention rules and a privacy assessment.
 - Never put authentication tokens, phone numbers, ICCIDs or personal information in logs.
-- The API applies a basic fixed-window rate limit to Google sign-in and OTP endpoints. Before production, review per-client throttling behind the host proxy, alerting, lockout/recovery policy, monitoring, strict CORS origins and additional abuse protections.
+- The API applies a basic fixed-window rate limit to Google sign-in. Before production, review per-client throttling behind the host proxy, alerting, lockout/recovery policy, monitoring, strict CORS origins and additional abuse protections.
