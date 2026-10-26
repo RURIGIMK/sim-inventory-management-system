@@ -1,4 +1,5 @@
 using SimInventory.Api.Models;
+using Xunit;
 
 namespace SimInventory.Api.Tests;
 
@@ -8,7 +9,6 @@ public class SimModelTests
     public void NewSimDefaultsToAvailable()
     {
         var sim = new Sim();
-
         Assert.Equal(SimStatus.Available, sim.Status);
     }
 
@@ -29,5 +29,21 @@ public class SimModelTests
         Assert.Equal("893100000000000001", sim.Iccid);
         Assert.Equal(1500m, sim.MonthlyCost);
         Assert.Equal("CC-1001", sim.CostCentre);
+    }
+
+    [Fact]
+    public void NewUserDefaultsToLeastPrivilegeViewerRole()
+    {
+        var user = new AppUser();
+        Assert.Equal(UserRole.Viewer, user.Role);
+        Assert.True(user.IsActive);
+        Assert.False(user.TotpEnabled);
+    }
+
+    [Fact]
+    public void NewEmployeeDefaultsToActive()
+    {
+        var employee = new Employee();
+        Assert.Equal(EmploymentStatus.Active, employee.Status);
     }
 }
