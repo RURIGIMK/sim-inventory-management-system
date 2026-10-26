@@ -155,9 +155,10 @@ export default function Home() {
         <nav aria-label="Main navigation">
           <a className="nav-item selected" href="#inventory"><span className="nav-symbol">▦</span> Inventory <span className="nav-count">{sims.length}</span></a>
           <a className="nav-item" href="#overview"><span className="nav-symbol">◫</span> Overview</a>
-          <a className="nav-item" href="/admin"><span className="nav-symbol">♙</span> User administration</a>
-          <a className="nav-item disabled" href="#allocation" onClick={e => { e.preventDefault(); setNotice("Allocation workflow is planned and not yet implemented."); }}><span className="nav-symbol">⇄</span> Allocations</a>
-          <a className="nav-item disabled" href="#audit" onClick={e => { e.preventDefault(); setNotice("Audit log is planned and not yet implemented."); }}><span className="nav-symbol">≡</span> Audit log</a>
+          <a className="nav-item" href="/employees"><span className="nav-symbol">♙</span> Employees</a>
+          <a className="nav-item" href="/allocations"><span className="nav-symbol">⇄</span> Allocations</a>
+          <a className="nav-item" href="/admin"><span className="nav-symbol">⚙</span> User administration</a>
+          <a className="nav-item" href="#" onClick={async e => { e.preventDefault(); try { const token = sessionStorage.getItem("simAccessToken") || ""; const r = await fetch(API + "/api/admin/audit", { headers: { Authorization: "Bearer " + token } }); if (!r.ok) throw new Error("Administrator access required to view audit records."); const data = await r.json(); setNotice("Audit endpoint returned " + data.length + " events. Open /api/admin/audit/verify to check hash-chain integrity."); } catch (error) { setNotice(error instanceof Error ? error.message : "Could not load audit records."); } }}><span className="nav-symbol">≡</span> Audit log</a>
           <a className="nav-item disabled" href="#reports" onClick={e => { e.preventDefault(); setNotice("Reporting is planned and not yet implemented."); }}><span className="nav-symbol">▤</span> Reports</a>
         </nav>
         <div className="sidebar-bottom"><span className="status-led" /> Development environment <small>Version 0.1.0</small></div>
