@@ -46,7 +46,7 @@ export default function AdminUsersPage() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.message || "Could not create account.");
       setEmail(""); setDisplayName(""); setRole("Viewer");
-      setNotice("Account provisioned. The user can sign in with this exact Google email and will be asked to enrol in authenticator MFA.");
+      setNotice("Account approved. The user can sign in with this exact Google email.");
       await loadUsers();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create account."); }
     finally { setBusy(false); }
