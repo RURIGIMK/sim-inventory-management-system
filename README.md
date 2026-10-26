@@ -25,7 +25,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - Administrator UI and APIs to create accounts, change roles, disable or re-enable accounts.
 - Backend role authorization and disabled-account checks on authenticated requests.
 - SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
-- Employee directory APIs and interface, with administrator-managed employee records and status.
+- Read-only employee directory backed by PostgreSQL, with 30 synthetic employee records and 30 available synthetic SIM records seeded idempotently at API startup. The seed never deletes or overwrites existing records. A real organization must connect an approved HR data feed before using actual employee records.
 - SIM allocation, return and reassignment APIs and interface, preserving assignment history.
 - Hash-linked audit events, timestamp-stable SHA-256 verification and an administrator-only audit verification endpoint.\n- Explainable SIM Asset Intelligence alerts for unusual same-operator costs, contract dates and inventory consistency, with human-review guidance.
 - GitHub Actions CI workflow and gated deployment workflow.
@@ -65,7 +65,7 @@ The API uses `EnsureCreatedAsync` for this early prototype. Before production, r
 
 | Role | Access |
 | --- | --- |
-| Administrator | Provision and manage accounts, manage employee records, manage SIMs, manage allocations, review and verify audit trail |
+| Administrator | Provision and manage accounts, view the employee directory, manage SIMs and allocations, review and verify the audit trail |
 | Departmental Manager | View employees and SIMs, register SIMs, allocate, return and reassign SIMs |
 | Viewer | Read-only SIM, employee and allocation views |
 
@@ -79,7 +79,7 @@ New accounts should normally be created as Viewer and elevated only when justifi
 | GET | `/api/auth/me` | Authenticated session |
 | GET / POST | `/api/admin/users` | Administrator |
 | PUT | `/api/admin/users/{id}` | Administrator |
-| GET / POST | `/api/employees`, `/api/admin/employees` | Authenticated read / administrator write |
+| GET | `/api/employees` | Authenticated read-only directory |
 | PUT | `/api/admin/employees/{id}/status` | Administrator |
 | GET / POST | `/api/sims` | Authenticated read / manager or administrator write |
 | GET / POST | `/api/allocations` | Authenticated read / manager or administrator write |
@@ -90,7 +90,7 @@ New accounts should normally be created as Viewer and elevated only when justifi
 
 ## Data handling
 
-Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, access tokens or actual organizational data.
+Only synthetic data belongs in this repository. The starter seed uses `DEMO-EMP-*`, `DEMO-NUMBER-*`, `DEMO-ICCID-*`, and `example.test` email addresses. These values are placeholders, not real employees or active SIM subscriptions. The employee directory is read-only in the application; connect an approved HR feed for real organizational data. Do not commit Google credentials, Neon URLs, JWT keys, access tokens or actual organizational data.
 
 ## Deployment
 
