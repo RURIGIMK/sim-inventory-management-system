@@ -10,7 +10,6 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 - API: ASP.NET Core 8, C# and Entity Framework Core.
 - Database: Neon PostgreSQL for hosted persistence; Docker PostgreSQL for local work.
 - Identity: Google sign-in matched to administrator-provisioned accounts.
-- Verification: six-digit email OTP after Google sign-in, required for every sign-in.
 - Roles: Administrator, Departmental Manager, Viewer.
 - CI/CD: GitHub Actions, with deployments gated by repository configuration.
 - API host: Render Free Web Service for prototype deployments.
@@ -21,8 +20,7 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 
 - An unknown Google email is rejected unless it matches the configured bootstrap administrator email.
 - A provisioned Google account must pass Google token validation and verified-email checks.
-- Every successful Google sign-in must be followed by a valid email OTP before accessing protected APIs.
-- OTP codes expire after five minutes, allow at most five attempts and are invalidated after use.
+- A successful Google sign-in returns an application session only when the verified, normalized email matches an active administrator-provisioned account, or the configured bootstrap administrator when the database is empty.
 - A disabled account cannot access protected APIs, including with a previously issued token.
 - Administrators can create accounts, change roles, disable and re-enable accounts through the application.
 - New accounts default to Viewer unless the administrator explicitly selects another role.

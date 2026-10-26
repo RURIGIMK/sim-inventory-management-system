@@ -37,8 +37,6 @@ public class SimModelTests
         var user = new AppUser();
         Assert.Equal(UserRole.Viewer, user.Role);
         Assert.True(user.IsActive);
-        Assert.Null(user.EmailOtpCodeHash);
-        Assert.Equal(0, user.EmailOtpAttempts);
     }
 
     [Fact]

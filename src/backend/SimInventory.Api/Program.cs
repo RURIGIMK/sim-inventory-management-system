@@ -20,7 +20,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddHttpClient<EmailOtpSender>();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
@@ -92,8 +91,6 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Session", policy => policy.RequireAuthenticatedUser()
         .RequireClaim("stage", "session"));
-    options.AddPolicy("EmailOtpChallenge", policy => policy.RequireAuthenticatedUser()
-        .RequireClaim("stage", "email_otp"));
     options.AddPolicy("Managers", policy => policy.RequireAuthenticatedUser()
         .RequireClaim("stage", "session")
         .RequireRole(nameof(UserRole.Administrator), nameof(UserRole.DepartmentalManager)));
@@ -134,16 +131,10 @@ using (var scope = app.Services.CreateScope())
         CREATE TABLE IF NOT EXISTS "Users" (
             "Id" uuid PRIMARY KEY, "Email" varchar(320) NOT NULL, "DisplayName" varchar(160) NOT NULL,
             "Role" varchar(40) NOT NULL, "IsActive" boolean NOT NULL,
-            "EmailOtpCodeHash" varchar(64) NULL, "EmailOtpExpiresAt" timestamptz NULL,
-            "EmailOtpAttempts" integer NOT NULL DEFAULT 0, "EmailOtpSentAt" timestamptz NULL,
             "CreatedAt" timestamptz NOT NULL,
             "UpdatedAt" timestamptz NOT NULL, "DisabledAt" timestamptz NULL
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Email" ON "Users" ("Email");
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpCodeHash" varchar(64) NULL;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpExpiresAt" timestamptz NULL;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpAttempts" integer NOT NULL DEFAULT 0;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpSentAt" timestamptz NULL;
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "TotpEnabled" boolean NOT NULL DEFAULT false;
         ALTER TABLE "Users" ALTER COLUMN "TotpEnabled" SET DEFAULT false;
         """);
@@ -182,7 +173,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "sim-i
 
 app.MapPost("/api/auth/google", async (
     GoogleCredentialRequest request, IConfiguration configuration, SimInventoryDbContext db,
-    TokenService tokens, EmailOtpSender emailSender) =>
+    TokenService tokens) =>
 {
     var clientId = configuration["Authentication:GoogleClientId"];
     if (string.IsNullOrWhiteSpace(clientId))
@@ -227,95 +218,17 @@ app.MapPost("/api/auth/google", async (
         return Results.Json(new { message = "This account has been disabled. Contact an administrator." },
             statusCode: StatusCodes.Status403Forbidden);
 
-    var otpSigningKey = configuration["Authentication:EmailOtpSigningKey"];
-    if (string.IsNullOrWhiteSpace(otpSigningKey) || Encoding.UTF8.GetByteCount(otpSigningKey) < 32)
-        return Results.Problem("Email verification is not configured correctly.", statusCode: 503);
-
-    var now = DateTimeOffset.UtcNow;
-    if (user.EmailOtpCodeHash is not null && user.EmailOtpSentAt is not null &&
-        now - user.EmailOtpSentAt.Value < TimeSpan.FromSeconds(60))
-        return Results.Json(new { message = "A code was sent recently. Wait one minute before requesting another." },
-            statusCode: StatusCodes.Status429TooManyRequests);
-
-    var code = EmailOtpHelper.CreateCode();
-    user.EmailOtpCodeHash = EmailOtpHelper.Hash(user.Id, code, otpSigningKey);
-    user.EmailOtpExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
-    user.EmailOtpAttempts = 0;
-    user.EmailOtpSentAt = now;
-    user.UpdatedAt = now;
-    await db.SaveChangesAsync();
-
-    try
-    {
-        await emailSender.SendAsync(user.Email, user.DisplayName, code);
-    }
-    catch (Exception)
-    {
-        user.EmailOtpCodeHash = null;
-        user.EmailOtpExpiresAt = null;
-        user.EmailOtpAttempts = 0;
-        user.EmailOtpSentAt = null;
-        await db.SaveChangesAsync();
-        return Results.Problem("We could not send your email code. The email service may not be configured yet.", statusCode: 503);
-    }
-
     var auditActor = new ClaimsPrincipal(new ClaimsIdentity(new[]
     {
         new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
         new Claim(ClaimTypes.Email, user.Email)
     }));
-    await AuditWriter.WriteAsync(db, auditActor, "login_email_otp_sent", "user", user.Id.ToString(), "{\"expiresInMinutes\":5}");
+    await AuditWriter.WriteAsync(db, auditActor, "login_successful", "user", user.Id.ToString(), "{}");
     await db.SaveChangesAsync();
 
-    return Results.Ok(new AuthResponse("email_otp_required",
-        tokens.CreateToken(user, "email_otp", 5), user.Email, user.DisplayName, user.Role.ToString()));
+    return Results.Ok(new AuthResponse("authenticated",
+        tokens.CreateToken(user), user.Email, user.DisplayName, user.Role.ToString()));
 }).RequireRateLimiting("auth");
-
-app.MapPost("/api/auth/otp", async (
-    EmailOtpRequest request, ClaimsPrincipal principal, SimInventoryDbContext db,
-    TokenService tokens, IConfiguration configuration) =>
-{
-    var user = await CurrentUserAsync(principal, db);
-    if (user is null || string.IsNullOrWhiteSpace(user.EmailOtpCodeHash) ||
-        user.EmailOtpExpiresAt is null || user.EmailOtpExpiresAt <= DateTimeOffset.UtcNow)
-        return Results.BadRequest(new { message = "This code has expired. Sign in with Google again to request a new code." });
-
-    if (user.EmailOtpAttempts >= 5)
-    {
-        user.EmailOtpCodeHash = null;
-        user.EmailOtpExpiresAt = null;
-        user.EmailOtpAttempts = 0;
-        await db.SaveChangesAsync();
-        return Results.Json(new { message = "Too many attempts. Sign in with Google again to request a new code." },
-            statusCode: StatusCodes.Status429TooManyRequests);
-    }
-
-    user.EmailOtpAttempts++;
-    var otpSigningKey = configuration["Authentication:EmailOtpSigningKey"] ?? string.Empty;
-    var valid = request.Code is { Length: 6 } && request.Code.All(char.IsDigit) &&
-        otpSigningKey.Length >= 32 &&
-        EmailOtpHelper.Verify(user.Id, request.Code, user.EmailOtpCodeHash, otpSigningKey);
-    if (!valid)
-    {
-        if (user.EmailOtpAttempts >= 5)
-        {
-            user.EmailOtpCodeHash = null;
-            user.EmailOtpExpiresAt = null;
-            user.EmailOtpAttempts = 0;
-        }
-        await db.SaveChangesAsync();
-        return Results.BadRequest(new { message = "Invalid or expired email code." });
-    }
-
-    user.EmailOtpCodeHash = null;
-    user.EmailOtpExpiresAt = null;
-    user.EmailOtpAttempts = 0;
-    user.EmailOtpSentAt = null;
-    user.UpdatedAt = DateTimeOffset.UtcNow;
-    await AuditWriter.WriteAsync(db, principal, "login_email_otp_verified", "user", user.Id.ToString(), "{}");
-    await db.SaveChangesAsync();
-    return Results.Ok(new AuthResponse("authenticated", tokens.CreateToken(user), user.Email, user.DisplayName, user.Role.ToString()));
-}).RequireAuthorization("EmailOtpChallenge").RequireRateLimiting("auth");
 
 app.MapGet("/api/auth/me", async (ClaimsPrincipal principal, SimInventoryDbContext db) =>
 {
