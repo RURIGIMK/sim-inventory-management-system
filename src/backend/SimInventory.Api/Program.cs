@@ -225,12 +225,12 @@ app.MapPost("/api/auth/google", async (
         return Results.Json(new { message = "This account has been disabled. Contact an administrator." },
             statusCode: StatusCodes.Status403Forbidden);
 
-    var signingKey = configuration["Authentication:JwtSigningKey"];
-    if (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
+    var otpSigningKey = configuration["Authentication:EmailOtpSigningKey"];
+    if (string.IsNullOrWhiteSpace(otpSigningKey) || Encoding.UTF8.GetByteCount(otpSigningKey) < 32)
         return Results.Problem("Email verification is not configured correctly.", statusCode: 503);
 
     var code = EmailOtpHelper.CreateCode();
-    user.EmailOtpCodeHash = EmailOtpHelper.Hash(user.Id, code, signingKey);
+    user.EmailOtpCodeHash = EmailOtpHelper.Hash(user.Id, code, otpSigningKey);
     user.EmailOtpExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
     user.EmailOtpAttempts = 0;
     user.EmailOtpSentAt = DateTimeOffset.UtcNow;
@@ -282,9 +282,10 @@ app.MapPost("/api/auth/otp", async (
     }
 
     user.EmailOtpAttempts++;
-    var signingKey = configuration["Authentication:JwtSigningKey"] ?? string.Empty;
+    var otpSigningKey = configuration["Authentication:EmailOtpSigningKey"] ?? string.Empty;
     var valid = request.Code is { Length: 6 } && request.Code.All(char.IsDigit) &&
-        EmailOtpHelper.Verify(user.Id, request.Code, user.EmailOtpCodeHash, signingKey);
+        otpSigningKey.Length >= 32 &&
+        EmailOtpHelper.Verify(user.Id, request.Code, user.EmailOtpCodeHash, otpSigningKey);
     if (!valid)
     {
         if (user.EmailOtpAttempts >= 5)
