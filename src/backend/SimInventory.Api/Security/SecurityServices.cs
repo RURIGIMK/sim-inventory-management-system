@@ -40,32 +40,6 @@ public sealed class TokenService(IConfiguration configuration, IHostEnvironment 
 }
 
 
-public static class EmailOtpHelper
-{
-    public static string CreateCode() =>
-        RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-
-    public static string Hash(Guid userId, string code, string signingKey)
-    {
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(signingKey));
-        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes($"{userId:N}:{code}")));
-    }
-
-    public static bool Verify(Guid userId, string code, string expectedHash, string signingKey)
-    {
-        var actual = Hash(userId, code, signingKey);
-        try
-        {
-            return CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(actual), Convert.FromHexString(expectedHash));
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-}
-
 public static class AuditWriter
 {
     public static async Task WriteAsync(SimInventory.Api.Data.SimInventoryDbContext db,
