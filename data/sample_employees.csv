@@ -1,0 +1,4 @@
+employee_number,full_name,email,department,cost_centre,status
+EMP-DEMO-001,Alex Sample,alex.sample@example.invalid,Operations,OPS-DEMO,Active
+EMP-DEMO-002,Jordan Example,jordan.example@example.invalid,Finance,FIN-DEMO,Active
+EMP-DEMO-003,Taylor Demo,taylor.demo@example.invalid,Information Technology,IT-DEMO,Inactive
