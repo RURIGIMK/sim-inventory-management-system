@@ -294,6 +294,138 @@ app.MapPost("/api/sims", async (Sim sim, ClaimsPrincipal principal, SimInventory
     return Results.Created($"/api/sims/{sim.Id}", sim);
 }).RequireAuthorization("Managers");
 
+
+app.MapGet("/api/employees", async (SimInventoryDbContext db) =>
+    Results.Ok(await db.Employees.AsNoTracking().OrderBy(x => x.EmployeeNumber)
+        .Select(x => new { x.Id, x.EmployeeNumber, x.FullName, x.Email, x.Department, x.CostCentre, status = x.Status.ToString() })
+        .ToListAsync())).RequireAuthorization("Session");
+
+app.MapPost("/api/admin/employees", async (CreateEmployeeRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.EmployeeNumber) || string.IsNullOrWhiteSpace(request.FullName) ||
+        string.IsNullOrWhiteSpace(request.Department) || string.IsNullOrWhiteSpace(request.CostCentre))
+        return Results.BadRequest(new { message = "Employee number, full name, department and cost centre are required." });
+    var employeeNumber = request.EmployeeNumber.Trim();
+    if (await db.Employees.AnyAsync(x => x.EmployeeNumber == employeeNumber))
+        return Results.Conflict(new { message = "An employee with this employee number already exists." });
+    var employee = new Employee
+    {
+        EmployeeNumber = employeeNumber, FullName = request.FullName.Trim(),
+        Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim().ToLowerInvariant(),
+        Department = request.Department.Trim(), CostCentre = request.CostCentre.Trim(), Status = EmploymentStatus.Active
+    };
+    db.Employees.Add(employee);
+    await AuditWriter.WriteAsync(db, principal, "employee_created", "employee", employee.Id.ToString(),
+        System.Text.Json.JsonSerializer.Serialize(new { employee.EmployeeNumber, employee.Department, employee.CostCentre }));
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/employees/{employee.Id}", new { employee.Id, employee.EmployeeNumber, employee.FullName, employee.Department, employee.CostCentre, status = employee.Status.ToString() });
+}).RequireAuthorization("Administrators");
+
+app.MapPut("/api/admin/employees/{id:int}/status", async (int id, UpdateEmployeeStatusRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    if (!Enum.IsDefined(request.Status)) return Results.BadRequest(new { message = "Invalid employment status." });
+    var employee = await db.Employees.SingleOrDefaultAsync(x => x.Id == id);
+    if (employee is null) return Results.NotFound();
+    if (request.Status != EmploymentStatus.Active && await db.Assignments.AnyAsync(x => x.EmployeeId == id && x.ReturnedAt == null))
+        return Results.Conflict(new { message = "Return all currently assigned SIMs before deactivating or terminating this employee." });
+    var before = employee.Status.ToString();
+    employee.Status = request.Status;
+    await AuditWriter.WriteAsync(db, principal, "employee_status_changed", "employee", employee.Id.ToString(),
+        System.Text.Json.JsonSerializer.Serialize(new { before, after = request.Status.ToString() }));
+    await db.SaveChangesAsync();
+    return Results.Ok(new { employee.Id, status = employee.Status.ToString() });
+}).RequireAuthorization("Administrators");
+
+app.MapGet("/api/allocations", async (SimInventoryDbContext db) =>
+    Results.Ok(await db.Assignments.AsNoTracking().Include(x => x.Sim).Include(x => x.Employee)
+        .OrderByDescending(x => x.AssignedAt)
+        .Select(x => new
+        {
+            x.Id, x.SimId, simPhoneNumber = x.Sim.PhoneNumber, simIccid = x.Sim.Iccid,
+            x.EmployeeId, employeeNumber = x.Employee.EmployeeNumber, employeeName = x.Employee.FullName,
+            x.AssignedAt, x.ReturnedAt, x.AssignedByUserId, x.ReturnedByUserId, x.Notes, isActive = x.ReturnedAt == null
+        }).ToListAsync())).RequireAuthorization("Session");
+
+app.MapPost("/api/allocations", async (AllocateSimRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    var sim = await db.Sims.SingleOrDefaultAsync(x => x.Id == request.SimId);
+    if (sim is null) return Results.NotFound(new { message = "SIM not found." });
+    var employee = await db.Employees.SingleOrDefaultAsync(x => x.Id == request.EmployeeId);
+    if (employee is null) return Results.NotFound(new { message = "Employee not found." });
+    if (employee.Status != EmploymentStatus.Active)
+        return Results.Conflict(new { message = "Only active employees can receive a SIM." });
+    if (sim.Status != SimStatus.Available || await db.Assignments.AnyAsync(x => x.SimId == sim.Id && x.ReturnedAt == null))
+        return Results.Conflict(new { message = "This SIM is not available for allocation." });
+    var actorId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var assignment = new SimAssignment { SimId = sim.Id, EmployeeId = employee.Id, AssignedByUserId = actorId, Notes = request.Notes?.Trim() ?? string.Empty };
+    sim.Status = SimStatus.Allocated;
+    db.Assignments.Add(assignment);
+    await AuditWriter.WriteAsync(db, principal, "sim_allocated", "assignment", assignment.Id.ToString(),
+        System.Text.Json.JsonSerializer.Serialize(new { sim.Id, employee.Id, employee.EmployeeNumber }));
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/allocations/{assignment.Id}", new { assignment.Id, assignment.SimId, assignment.EmployeeId, assignment.AssignedAt });
+}).RequireAuthorization("Managers");
+
+app.MapPost("/api/allocations/{id:int}/return", async (int id, ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    var assignment = await db.Assignments.Include(x => x.Sim).SingleOrDefaultAsync(x => x.Id == id);
+    if (assignment is null) return Results.NotFound();
+    if (assignment.ReturnedAt is not null) return Results.Conflict(new { message = "This allocation has already been returned." });
+    var actorId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    assignment.ReturnedAt = DateTimeOffset.UtcNow;
+    assignment.ReturnedByUserId = actorId;
+    if (assignment.Sim.Status != SimStatus.Deactivated) assignment.Sim.Status = SimStatus.Available;
+    await AuditWriter.WriteAsync(db, principal, "sim_returned", "assignment", assignment.Id.ToString(),
+        System.Text.Json.JsonSerializer.Serialize(new { assignment.SimId, assignment.EmployeeId }));
+    await db.SaveChangesAsync();
+    return Results.Ok(new { assignment.Id, assignment.ReturnedAt, status = assignment.Sim.Status.ToString() });
+}).RequireAuthorization("Managers");
+
+app.MapPost("/api/allocations/{id:int}/reassign", async (int id, ReassignSimRequest request, ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    await using var transaction = await db.Database.BeginTransactionAsync();
+    var previous = await db.Assignments.Include(x => x.Sim).SingleOrDefaultAsync(x => x.Id == id);
+    if (previous is null) return Results.NotFound();
+    if (previous.ReturnedAt is not null) return Results.Conflict(new { message = "Only an active allocation can be reassigned." });
+    var nextEmployee = await db.Employees.SingleOrDefaultAsync(x => x.Id == request.EmployeeId);
+    if (nextEmployee is null) return Results.NotFound(new { message = "Employee not found." });
+    if (nextEmployee.Status != EmploymentStatus.Active)
+        return Results.Conflict(new { message = "Only active employees can receive a SIM." });
+    if (previous.EmployeeId == nextEmployee.Id)
+        return Results.BadRequest(new { message = "Choose a different employee for reassignment." });
+
+    var actorId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    previous.ReturnedAt = DateTimeOffset.UtcNow;
+    previous.ReturnedByUserId = actorId;
+    var next = new SimAssignment
+    {
+        SimId = previous.SimId, EmployeeId = nextEmployee.Id, AssignedByUserId = actorId,
+        Notes = request.Notes?.Trim() ?? string.Empty
+    };
+    db.Assignments.Add(next);
+    previous.Sim.Status = SimStatus.Allocated;
+    await AuditWriter.WriteAsync(db, principal, "sim_reassigned", "assignment", next.Id.ToString(),
+        System.Text.Json.JsonSerializer.Serialize(new { simId = previous.SimId, fromEmployeeId = previous.EmployeeId, toEmployeeId = nextEmployee.Id }));
+    await db.SaveChangesAsync();
+    await transaction.CommitAsync();
+    return Results.Created($"/api/allocations/{next.Id}", new { next.Id, next.SimId, next.EmployeeId, next.AssignedAt });
+}).RequireAuthorization("Managers");
+
+app.MapGet("/api/admin/audit/verify", async (SimInventoryDbContext db) =>
+{
+    var events = await db.AuditEvents.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
+    var previous = "GENESIS";
+    foreach (var entry in events)
+    {
+        var canonical = $"{previous}|{entry.CreatedAt:O}|{entry.ActorEmail}|{entry.Action}|{entry.EntityType}|{entry.EntityId}|{entry.Details}";
+        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+        if (entry.PreviousHash != previous || entry.Hash != expected)
+            return Results.Ok(new { valid = false, checkedEvents = entry.Id - 1, firstInvalidEventId = entry.Id });
+        previous = entry.Hash;
+    }
+    return Results.Ok(new { valid = true, checkedEvents = events.Count, firstInvalidEventId = (long?)null });
+}).RequireAuthorization("Administrators");
+
 static Task<AppUser?> CurrentUserAsync(ClaimsPrincipal principal, SimInventoryDbContext db)
 {
     var idText = principal.FindFirstValue(ClaimTypes.NameIdentifier);
