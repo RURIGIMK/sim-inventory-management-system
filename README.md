@@ -12,7 +12,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 | Hosted database | Neon PostgreSQL |
 | Local database | Docker PostgreSQL |
 | Authentication | Google sign-in for administrator-provisioned accounts |
-| Verification | Email OTP after Google sign-in |
+| Access control | Administrator-approved Google email accounts |
 | Authorization | API-enforced Administrator, Departmental Manager and Viewer roles |
 | CI | GitHub Actions build, type-check and test |
 | CD | Gated GitHub Actions deployment to Render and Cloudflare Pages |
@@ -22,7 +22,6 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 
 - Google ID-token validation and email matching against provisioned application accounts.
 - One-time bootstrap administrator configured through environment variables.
-- Email OTP after Google sign-in, with hashed, expiring codes and attempt limits.
 - Administrator UI and APIs to create accounts, change roles, disable or re-enable accounts.
 - Backend role authorization and disabled-account checks on authenticated requests.
 - SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
@@ -48,7 +47,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
        dotnet restore
        dotnet run
 
-   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Authentication__EmailOtpSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The API requires an email provider API key and sender address to send codes. Google sign-in still needs a valid OAuth client ID.
+   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail` and `Authentication__JwtSigningKey` as environment variables. Google sign-in still needs a valid OAuth client ID.
 
 3. In another terminal, configure and run the frontend:
 
@@ -58,7 +57,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 
    Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:5080` if that is the API URL reported by your local launch profile, and set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the same Google Web OAuth client ID used by the API.
 
-4. Open `http://localhost:3000/login`. Sign in using the configured bootstrap administrator Google account. Enter the six-digit code sent to your email. Then use User administration to provision each additional account.
+4. Open `http://localhost:3000/login`. Sign in using the configured bootstrap administrator Google account. After the first administrator is created, use User administration to approve additional Google email addresses and assign their roles. Approved users sign in directly with Google.
 
 The API uses `EnsureCreatedAsync` for this early prototype. Before production, replace it with versioned EF Core migrations and a reviewed deployment migration process.
 
@@ -76,8 +75,7 @@ New accounts should normally be created as Viewer and elevated only when justifi
 
 | Method | Route | Access |
 | --- | --- | --- |
-| POST | `/api/auth/google` | Public, validates Google ID token and sends email OTP |
-| POST | `/api/auth/otp` | Verify email OTP challenge |
+| POST | `/api/auth/google` | Public, validates Google ID token and checks approved account access |
 | GET | `/api/auth/me` | Authenticated session |
 | GET / POST | `/api/admin/users` | Administrator |
 | PUT | `/api/admin/users/{id}` | Administrator |
@@ -92,11 +90,11 @@ New accounts should normally be created as Viewer and elevated only when justifi
 
 ## Data handling
 
-Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, email OTP signing keys, access tokens or actual organizational data.
+Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, access tokens or actual organizational data.
 
 ## Deployment
 
-Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by the `DEPLOY_ENABLED` repository variable and requires a Render deploy hook, Cloudflare Pages credentials, Google OAuth Client ID and repository variables. Neon, email-provider and signing keys are configured in Render.
+Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by the `DEPLOY_ENABLED` repository variable and requires a Render deploy hook, Cloudflare Pages credentials, Google OAuth Client ID and repository variables. Neon connection details and the JWT signing key are configured in Render.
 
 - [Technical specification and acceptance criteria](docs/TECHNICAL_SPECIFICATION.md)
 - [Security design and limitations](docs/SECURITY.md)
