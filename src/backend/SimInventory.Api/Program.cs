@@ -96,7 +96,7 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+// Cloud Run terminates public HTTPS at its edge; local development may use HTTP.
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -361,7 +361,7 @@ app.MapPost("/api/allocations", async (AllocateSimRequest request, ClaimsPrincip
     sim.Status = SimStatus.Allocated;
     db.Assignments.Add(assignment);
     await AuditWriter.WriteAsync(db, principal, "sim_allocated", "assignment", assignment.Id.ToString(),
-        System.Text.Json.JsonSerializer.Serialize(new { sim.Id, employee.Id, employee.EmployeeNumber }));
+        System.Text.Json.JsonSerializer.Serialize(new { simId = sim.Id, employeeId = employee.Id, employee.EmployeeNumber }));
     await db.SaveChangesAsync();
     return Results.Created($"/api/allocations/{assignment.Id}", new { assignment.Id, assignment.SimId, assignment.EmployeeId, assignment.AssignedAt });
 }).RequireAuthorization("Managers");
