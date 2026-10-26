@@ -53,7 +53,7 @@ Use synthetic records only. Record the date, build/commit, input or conditions, 
 | FAIL-01 | Stop or make the API unavailable, then use the frontend | The interface shows a clear service error and does not imply failed changes were saved | Not yet evidenced |
 | DEP-01 | Open the deployed frontend and API health endpoint | Both are reachable over HTTPS and the frontend can communicate with the API | Not yet evidenced |
 
-Do not test tamper detection by modifying the live database. If demonstrating detection, use an isolated disposable test database or a dedicated test fixture.
+Do not test tamper detection by modifying the live database. If demonstrating detection, use an isolated disposable test database or a dedicated test fixture. Audit hashes are now computed with microsecond-normalized timestamps to survive PostgreSQL round trips. Records created before this correction may fail verification; do not rewrite old audit history to make the check pass. Investigate existing failures or use a clean synthetic database for a controlled demonstration.
 
 ## Initial evaluation and evidence to collect
 
