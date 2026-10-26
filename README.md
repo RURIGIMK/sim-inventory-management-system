@@ -18,7 +18,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 | CD | Gated GitHub Actions deployment to Render and Cloudflare Pages |
 | Optional ML research | Google Colab using synthetic data only |
 
-## Implemented in this branch
+## Implemented capabilities
 
 - Google ID-token validation and email matching against provisioned application accounts.
 - One-time bootstrap administrator configured through environment variables.
@@ -31,7 +31,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - GitHub Actions CI workflow and gated deployment workflow.
 - Render Docker deployment, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
-Check the open pull request and GitHub Actions before treating this branch as validated. No successful CI result is claimed until Actions reports green.
+Validation note: check the latest GitHub Actions run on `main`. A green CI run confirms the configured build, type-check and automated tests only. It does not replace end-to-end integration testing or a live demonstration.
 
 ## Local development
 
