@@ -15,14 +15,14 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 | MFA | Authenticator-app TOTP |
 | Authorization | API-enforced Administrator, Departmental Manager and Viewer roles |
 | CI | GitHub Actions build, type-check and test |
-| CD | Gated GitHub Actions deployment to Cloud Run and Cloudflare Pages |
+| CD | Gated GitHub Actions deployment to Render and Cloudflare Pages |
 | Optional ML research | Google Colab using synthetic data only |
 
 ## Implemented in this branch
 
 - Google ID-token validation and email matching against provisioned application accounts.
 - One-time bootstrap administrator configured through environment variables.
-- Required authenticator-app MFA, with TOTP secrets encrypted at rest.
+- Email OTP after Google sign-in, with hashed, expiring codes and attempt limits.
 - Administrator UI and APIs to create accounts, change roles, disable or re-enable accounts.
 - Backend role authorization and disabled-account checks on authenticated requests.
 - SIM inventory API protection, required fields, duplicate ICCID/phone-number checks and non-negative cost validation.
@@ -30,7 +30,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - SIM allocation, return and reassignment APIs and interface, preserving assignment history.
 - Hash-linked audit events and an administrator-only audit verification endpoint.
 - GitHub Actions CI workflow and gated deployment workflow.
-- Cloud Run Dockerfile, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
+- Render Docker deployment, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
 Check the open pull request and GitHub Actions before treating this branch as validated. No successful CI result is claimed until Actions reports green.
 
@@ -48,7 +48,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
        dotnet restore
        dotnet run
 
-   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey` and `Authentication__MfaEncryptionKey` as environment variables. The code contains clearly marked development-only fallback signing/encryption keys, but Google sign-in still needs a valid OAuth client ID.
+   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The code contains clearly marked development-only fallback signing/encryption keys, but Google sign-in still needs a valid OAuth client ID.
 
 3. In another terminal, configure and run the frontend:
 
@@ -58,7 +58,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 
    Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:5080` if that is the API URL reported by your local launch profile, and set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the same Google Web OAuth client ID used by the API.
 
-4. Open `http://localhost:3000/login`. Sign in using the configured bootstrap administrator Google account. Complete authenticator enrolment. Then use User administration to provision each additional account.
+4. Open `http://localhost:3000/login`. Sign in using the configured bootstrap administrator Google account. Enter the six-digit code sent to your email. Then use User administration to provision each additional account.
 
 The API uses `EnsureCreatedAsync` for this early prototype. Before production, replace it with versioned EF Core migrations and a reviewed deployment migration process.
 
@@ -109,8 +109,8 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by
 ## Important limitations before production
 
 - Use reviewed, versioned database migrations instead of startup schema creation.
-- Add secure HttpOnly session cookies, rate limiting, monitoring and a formal XSS/CSRF review.
+- Add secure HttpOnly session cookies, monitoring and a formal XSS/CSRF review.
 - Configure and test database backups, restore, data retention and access controls.
 - Hash-linked audit events are tamper-evident, not absolutely immutable. Add restricted database permissions and independent append-only archival for a real deployment.
 - Obtain written authorization and complete privacy/security reviews before importing organizational data.
-- Confirm current free-tier limits and potential charges. Cloud provider free tiers are not guaranteed to remain permanently free.
+- Confirm current free-tier limits. Render free services sleep when idle and are not suitable for production workloads.
