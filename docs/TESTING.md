@@ -1,54 +1,81 @@
-# Initial Testing and Evaluation
+# Testing and Evaluation Plan
 
-## Scope of this evidence
+## Evidence status
 
-This document separates automated tests already present in the repository from manual acceptance checks that should be run on the developer's machine. No result is marked as passed unless the test has actually been executed and observed.
+This document distinguishes automated checks already in the repository from manual checks that still need to be run and recorded. No manual test is marked as passed without observed evidence.
 
-## Automated backend tests
+## Automated checks currently in the repository
 
-Project: `tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj`
+GitHub Actions runs:
+- .NET 8 restore and Release build.
+- xUnit tests in `tests/SimInventory.Api.Tests`.
+- Frontend dependency audit, TypeScript type-check and Next.js static build.
 
-Current xUnit tests:
-- `NewSimDefaultsToAvailable`: verifies that a new SIM model defaults to Available.
-- `SimStoresCoreInventoryFields`: verifies that core inventory properties can be represented on the domain model.
+The current xUnit test file contains two basic model tests. These are useful smoke checks, but they do not yet test authentication, role enforcement, persistence, allocations, audit-chain verification or frontend user journeys. A green CI result must not be presented as proof that those workflows have passed.
 
-Run from the repository root:
+Run backend tests from the repository root:
 
-```powershell
-dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj
+```bash
+dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj --configuration Release
 ```
 
-Record the actual test count and result from the terminal or GitHub Actions run before presenting evidence.
+Run frontend checks:
 
-## Manual integration / acceptance checks
+```bash
+cd src/frontend
+npm install
+npm run lint
+npm run build
+```
 
-Use synthetic records only. The integrated path requires PostgreSQL, the ASP.NET Core API and the Next.js frontend running together.
+## Sprint III manual acceptance matrix
 
-| ID | Check | Expected result | Result |
+Use synthetic records only. Record the date, build/commit, input or conditions, expected result, actual result, pass/fail, evidence location and any corrective action for every executed test.
+
+| ID | Workflow / condition | Expected result | Status |
 | --- | --- | --- | --- |
-| INT-01 | Open `http://localhost:5080/api/health` | JSON health response with status `ok` | Pending local execution |
-| INT-02 | Open frontend at `http://localhost:3000` while API is available | Connection indicator shows API connected and records are loaded from the API | Pending local execution |
-| INT-03 | Register a SIM with unique ICCID and phone number | API returns created response and the record appears in the inventory list | Pending local execution |
-| INT-04 | Register the same ICCID again | API rejects the duplicate with HTTP 409 Conflict | Pending local execution |
-| INT-05 | Register a different ICCID with an existing phone number | API rejects the duplicate with HTTP 409 Conflict | Pending local execution |
-| INT-06 | Submit without ICCID or phone number through the API | API returns HTTP 400 Bad Request | Pending local execution |
-| UI-01 | Search by phone number, ICCID, operator or cost centre | Only matching rows remain visible | Pending local execution |
-| UI-02 | Filter by status | Only records with the selected status are displayed | Pending local execution |
-| UI-03 | Stop the API and reload the frontend | Interface falls back to clearly labelled synthetic demo mode | Pending local execution |
+| AUTH-01 | Sign in with configured bootstrap Google account against an empty database | Account is created as the first active administrator | Not yet evidenced |
+| AUTH-02 | Sign in with an unknown Google account after bootstrap | API rejects access and returns no application session | Not yet evidenced |
+| AUTH-03 | Sign in with an approved, active account | A session is returned and the user reaches the application | Not yet evidenced |
+| AUTH-04 | Sign in with a disabled account | API rejects sign-in | Not yet evidenced |
+| AUTH-05 | Use an existing token after the account is disabled | Protected API request is rejected | Not yet evidenced |
+| AUTH-06 | Viewer attempts a manager or administrator operation | API rejects the request even if the UI control is bypassed | Not yet evidenced |
+| USER-01 | Administrator creates an account and changes its role | Account is persisted, and the new role is enforced by the API | Not yet evidenced |
+| SIM-01 | Register a SIM with unique identifiers and valid cost | Record persists and appears in the inventory view | Not yet evidenced |
+| SIM-02 | Reuse an ICCID or phone number, or submit a negative cost | API rejects invalid data with a clear response | Not yet evidenced |
+| ALLOC-01 | Allocate an available SIM to an active employee | Allocation persists and SIM is no longer available for another active allocation | Not yet evidenced |
+| ALLOC-02 | Try to allocate a SIM that already has an active allocation | API rejects the conflicting allocation | Not yet evidenced |
+| ALLOC-03 | Return or reassign an allocated SIM | Assignment history remains available and current state is correct | Not yet evidenced |
+| EMP-01 | Attempt to deactivate an employee with an active SIM assignment | API rejects the operation and explains that the SIM must be returned first | Not yet evidenced |
+| AUD-01 | Perform an account, SIM, employee or allocation change | An audit event records the actor, action, entity and timestamp | Not yet evidenced |
+| AUD-02 | Run audit-chain verification on an intact chain | Verification reports a valid chain | Not yet evidenced |
+| UI-01 | Use search, filters and navigation on desktop and mobile-sized layouts | Results and controls remain usable and understandable | Not yet evidenced |
+| FAIL-01 | Stop or make the API unavailable, then use the frontend | The interface shows a clear service error and does not imply failed changes were saved | Not yet evidenced |
+| DEP-01 | Open the deployed frontend and API health endpoint | Both are reachable over HTTPS and the frontend can communicate with the API | Not yet evidenced |
 
-## Initial evaluation criteria
+Do not test tamper detection by modifying the live database. If demonstrating detection, use an isolated disposable test database or a dedicated test fixture.
 
-- Data integrity: duplicate ICCID and phone number checks are present in the registration endpoint and unique database indexes.
-- Workflow integration: frontend inventory listing and registration call the backend endpoints when the API is available.
-- Usability: the inventory screen exposes search, status filtering, key summary values and a registration form.
-- Transparency: demo-mode changes are not persisted; authentication, allocations, audit logging, reports and frontend tests remain incomplete.
+## Initial evaluation and evidence to collect
 
-## Evidence to capture for the project review
+For the information-system evaluation, prioritise:
+- Completion of the main user tasks: approved sign-in, SIM registration, allocation, return/reassignment and audit review.
+- Data integrity: duplicate identifiers, invalid costs, invalid state transitions and persistence after refresh.
+- Access control: unknown/disabled users and attempts to perform operations outside the user's role.
+- Usability: task clarity, error recovery and responsive layout. Record observations from a small number of representative testers if approved by the supervisor.
+- Deployment behaviour: HTTPS access, API/frontend connectivity, cold-start delay, service failure messaging and recovery.
 
-1. Screenshot of the inventory page with the connection indicator visible.
-2. Screenshot of a successfully registered synthetic SIM.
-3. Screenshot or API response showing duplicate registration rejected with HTTP 409.
-4. Terminal output from `dotnet test`.
-5. GitHub Actions run summary after it completes.
+Capture evidence only after each test has actually been run:
+1. GitHub Actions run summary and commit SHA.
+2. Successful and rejected login outcomes using test accounts.
+3. SIM registration and duplicate rejection.
+4. Allocation, return/reassignment and history.
+5. Audit log and verification result.
+6. Deployed frontend and `/api/health` endpoint.
+7. A dated test matrix with actual results and evidence filenames.
 
-Do not label pending checks as passed. Add dates and observed results after performing each check.
+## Reporting rules
+
+- Distinguish implemented functionality from functionality that has been tested.
+- Distinguish automated CI checks from manual integration and usability evaluation.
+- Report actual test counts, outcomes, sample sizes and limitations.
+- Never present synthetic data or a proposed ML experiment as real organisational evidence.
