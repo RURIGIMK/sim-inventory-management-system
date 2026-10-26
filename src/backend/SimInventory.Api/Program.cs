@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SimInventory.Api.Data;
 using SimInventory.Api.Models;
+using SimInventory.Api.Intelligence;
 using SimInventory.Api.Security;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -288,6 +289,15 @@ app.MapGet("/api/admin/audit", async (SimInventoryDbContext db) =>
     Results.Ok(await db.AuditEvents.AsNoTracking().OrderByDescending(x => x.Id).Take(500)
         .Select(x => new { x.Id, x.ActorEmail, x.Action, x.EntityType, x.EntityId, x.Details, x.CreatedAt, x.PreviousHash, x.Hash })
         .ToListAsync())).RequireAuthorization("Administrators");
+
+app.MapGet("/api/intelligence/alerts", async (SimInventoryDbContext db) =>
+{
+    var sims = await db.Sims.AsNoTracking().ToListAsync();
+    var assignments = await db.Assignments.AsNoTracking().ToListAsync();
+    var employees = await db.Employees.AsNoTracking().ToListAsync();
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    return Results.Ok(SimAssetIntelligence.Evaluate(sims, assignments, employees, today));
+}).RequireAuthorization("Session");
 
 app.MapGet("/api/sims", async (SimInventoryDbContext db) =>
     Results.Ok(await db.Sims.AsNoTracking().OrderBy(x => x.Id).ToListAsync()))
