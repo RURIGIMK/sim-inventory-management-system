@@ -25,17 +25,13 @@ type AuthReply = {
   email?: string;
   displayName?: string;
   role?: string;
-  totpSetupUri?: string;
-  manualSecret?: string;
   message?: string;
 };
 
 export default function LoginPage() {
-  const [stage, setStage] = useState<"google" | "setup" | "otp">("google");
+  const [stage, setStage] = useState<"google" | "otp">("google");
   const [pendingToken, setPendingToken] = useState("");
   const [email, setEmail] = useState("");
-  const [manualSecret, setManualSecret] = useState("");
-  const [setupUri, setSetupUri] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -55,11 +51,7 @@ export default function LoginPage() {
       setPendingToken(body.token);
       setEmail(body.email || "");
       sessionStorage.setItem("simPendingToken", body.token);
-      if (body.status === "mfa_setup_required") {
-        setStage("setup");
-        setManualSecret(body.manualSecret || "");
-        setSetupUri(body.totpSetupUri || "");
-      } else if (body.status === "mfa_required") {
+      if (body.status === "email_otp_required") {
         setStage("otp");
       } else if (body.status === "authenticated") {
         sessionStorage.setItem("simAccessToken", body.token);
@@ -92,7 +84,7 @@ export default function LoginPage() {
     setBusy(true);
     setError("");
     try {
-      const endpoint = stage === "setup" ? "/api/auth/mfa/setup" : "/api/auth/otp";
+      const endpoint = "/api/auth/otp";
       const response = await fetch(API + endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + pendingToken },
@@ -118,27 +110,16 @@ export default function LoginPage() {
         <section className="auth-card">
           <div className="auth-brand"><span className="brand-mark">S</span><div><strong>SIM Inventory</strong><small>ASSET CONTROL</small></div></div>
           <p className="auth-eyebrow">SECURE WORKSPACE</p>
-          <h1>{stage === "google" ? "Sign in to continue" : stage === "setup" ? "Set up your authenticator" : "Verify it’s you"}</h1>
+          <h1>{stage === "google" ? "Sign in to continue" : "Check your email"}</h1>
           <p className="auth-copy">
             {stage === "google"
               ? "Use the Google account that an administrator has provisioned for you."
-              : stage === "setup"
-                ? "Add this account to Google Authenticator, Microsoft Authenticator, or another TOTP app, then enter the current six-digit code."
-                : "Enter the current six-digit code from your authenticator app."}
+              : "A six-digit verification code has been sent to your email address. Enter it to finish signing in."}
           </p>
           {email && <p className="auth-account">{email}</p>}
           {stage === "google" && <>
             <div id="google-signin-button" className="google-button-slot" />
             {!GOOGLE_CLIENT_ID && <p className="auth-hint">Google sign-in is not configured yet. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID in the frontend environment.</p>}
-          </>}
-          {stage === "setup" && <>
-            <div className="secret-panel"><span>Manual setup key</span><code>{manualSecret || "Loading…"}</code><button type="button" onClick={() => { void navigator.clipboard.writeText(manualSecret); }}>Copy key</button></div>
-            <details><summary>Authenticator setup URI</summary><code className="uri-text">{setupUri}</code></details>
-            <form onSubmit={verifyCode} className="otp-form">
-              <label htmlFor="otp-code">Six-digit verification code</label>
-              <input id="otp-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e => setCode(e.target.value)} required />
-              <button className="primary-button" type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and enable MFA"}</button>
-            </form>
           </>}
           {stage === "otp" && <form onSubmit={verifyCode} className="otp-form">
             <label htmlFor="otp-code">Six-digit verification code</label>
@@ -147,7 +128,7 @@ export default function LoginPage() {
           </form>}
           {busy && <p className="auth-hint">Contacting the authentication service…</p>}
           {error && <p className="auth-error" role="alert">{error}</p>}
-          <p className="auth-footer">Accounts are invitation-only. If your Google account is not provisioned, contact the system administrator.</p>
+          <p className="auth-footer">Accounts are invitation-only. If your Google account is not provisioned, contact the system administrator. Codes expire after five minutes.</p>
         </section>
       </main>
     </>

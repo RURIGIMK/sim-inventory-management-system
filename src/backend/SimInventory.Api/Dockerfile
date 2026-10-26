@@ -7,8 +7,8 @@ RUN dotnet publish SimInventory.Api.csproj --configuration Release --output /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
-ENV ASPNETCORE_URLS=http://+:8080
-ENV ASPNETCORE_HTTP_PORTS=8080
-EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:10000
+ENV ASPNETCORE_HTTP_PORTS=10000
+EXPOSE 10000
 COPY --from=build /app/publish ./
 ENTRYPOINT ["dotnet", "SimInventory.Api.dll"]

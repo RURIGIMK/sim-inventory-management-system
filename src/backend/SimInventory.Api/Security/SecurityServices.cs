@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using OtpNet;
 using SimInventory.Api.Models;
 
 namespace SimInventory.Api.Security;
@@ -40,60 +39,31 @@ public sealed class TokenService(IConfiguration configuration, IHostEnvironment 
     }
 }
 
-public sealed class TotpSecretProtector(IConfiguration configuration, IHostEnvironment environment)
+
+public static class EmailOtpHelper
 {
-    private byte[] GetKey()
+    public static string CreateCode() =>
+        RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
+    public static string Hash(Guid userId, string code, string signingKey)
     {
-        var encoded = configuration["Authentication:MfaEncryptionKey"];
-        if (string.IsNullOrWhiteSpace(encoded) && environment.IsDevelopment())
-            encoded = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes("LOCAL-ONLY-MFA-KEY-DO-NOT-USE-IN-PRODUCTION")));
-        if (string.IsNullOrWhiteSpace(encoded))
-            throw new InvalidOperationException("Set Authentication:MfaEncryptionKey to a base64-encoded 32-byte key.");
-        var key = Convert.FromBase64String(encoded);
-        if (key.Length != 32)
-            throw new InvalidOperationException("Authentication:MfaEncryptionKey must decode to exactly 32 bytes.");
-        return key;
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(signingKey));
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes($"{userId:N}:{code}")));
     }
 
-    public string Protect(string secret)
+    public static bool Verify(Guid userId, string code, string expectedHash, string signingKey)
     {
-        var key = GetKey();
-        var nonce = RandomNumberGenerator.GetBytes(12);
-        var plaintext = Encoding.UTF8.GetBytes(secret);
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
-        using var aes = new AesGcm(key, tag.Length);
-        aes.Encrypt(nonce, plaintext, ciphertext, tag);
-        return Convert.ToBase64String(nonce.Concat(tag).Concat(ciphertext).ToArray());
+        var actual = Hash(userId, code, signingKey);
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(actual), Convert.FromHexString(expectedHash));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
-
-    public string Unprotect(string protectedValue)
-    {
-        var packed = Convert.FromBase64String(protectedValue);
-        if (packed.Length < 28) throw new CryptographicException("Invalid protected MFA secret.");
-        var nonce = packed[..12];
-        var tag = packed[12..28];
-        var ciphertext = packed[28..];
-        var plaintext = new byte[ciphertext.Length];
-        using var aes = new AesGcm(GetKey(), tag.Length);
-        aes.Decrypt(nonce, ciphertext, tag, plaintext);
-        return Encoding.UTF8.GetString(plaintext);
-    }
-}
-
-public static class TotpHelper
-{
-    public static string CreateSecret() => Base32Encoding.ToString(RandomNumberGenerator.GetBytes(20));
-
-    public static bool Verify(string secret, string code)
-    {
-        if (string.IsNullOrWhiteSpace(code) || code.Length != 6 || !code.All(char.IsDigit)) return false;
-        var bytes = Base32Encoding.ToBytes(secret);
-        return new Totp(bytes).VerifyTotp(code, out _, new VerificationWindow(previous: 1, future: 1));
-    }
-
-    public static string SetupUri(string email, string secret) =>
-        $"otpauth://totp/SIM%20Inventory:{Uri.EscapeDataString(email)}?secret={secret}&issuer=SIM%20Inventory&digits=6&period=30";
 }
 
 public static class AuditWriter
