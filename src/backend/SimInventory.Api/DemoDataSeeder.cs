@@ -41,7 +41,7 @@ public static class DemoDataSeeder
             var phoneNumber = $"DEMO-NUMBER-{index:0000}";
             if (!await db.Sims.AnyAsync(x => x.Iccid == iccid || x.PhoneNumber == phoneNumber))
             {
-                var operatorName = index % 3 switch
+                var operatorName = (index % 3) switch
                 {
                     0 => "Safaricom",
                     1 => "Airtel",
@@ -53,7 +53,7 @@ public static class DemoDataSeeder
                     Operator = operatorName,
                     PhoneNumber = phoneNumber,
                     Iccid = iccid,
-                    PlanType = index % 4 switch
+                    PlanType = (index % 4) switch
                     {
                         0 => "Corporate voice",
                         1 => "Corporate voice + data",
