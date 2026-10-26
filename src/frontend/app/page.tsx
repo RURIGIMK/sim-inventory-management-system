@@ -41,18 +41,10 @@ function normalizeSim(value: Record<string, unknown>): Sim {
     costCentre: String(value.costCentre ?? "")
   } as Sim;
 }
-const sample: Sim[] = [
-  { id: 101, operator: "Safaricom", phoneNumber: "254700000101", iccid: "893100000000000101", planType: "Corporate voice + data", monthlyCost: 2400, status: "Allocated", costCentre: "OPS-014" },
-  { id: 102, operator: "Airtel", phoneNumber: "254730000102", iccid: "893100000000000102", planType: "Data bundle", monthlyCost: 1500, status: "Available", costCentre: "IT-002" },
-  { id: 103, operator: "Safaricom", phoneNumber: "254711000103", iccid: "893100000000000103", planType: "Corporate voice", monthlyCost: 950, status: "Suspended", costCentre: "FIN-008" },
-  { id: 104, operator: "Telkom Kenya", phoneNumber: "254770000104", iccid: "893100000000000104", planType: "Field operations", monthlyCost: 1800, status: "Available", costCentre: "OPS-014" },
-  { id: 105, operator: "Airtel", phoneNumber: "254733000105", iccid: "893100000000000105", planType: "Data bundle", monthlyCost: 1200, status: "Deactivated", costCentre: "HR-003" }
-];
-
 export default function Home() {
-  const [sims, setSims] = useState<Sim[]>(sample);
-  const [mode, setMode] = useState<"demo" | "api">("demo");
-  const [connection, setConnection] = useState("Demo data loaded");
+  const [sims, setSims] = useState<Sim[]>([]);
+  const [mode, setMode] = useState<"loading" | "api" | "error">("loading");
+  const [connection, setConnection] = useState("Connecting to API");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All statuses");
   const [notice, setNotice] = useState("");
@@ -80,9 +72,10 @@ export default function Home() {
       setMode("api");
       setConnection("Connected to API");
     } catch {
-      setMode("demo");
-      setConnection("Demo mode · API unavailable");
-      setSims(current => current.length ? current : sample);
+      setMode("error");
+      setConnection("API unavailable");
+      setSims([]);
+      setNotice("Could not load inventory from the database. Check the API connection, then refresh.");
     }
   }, []);
 
@@ -102,6 +95,10 @@ export default function Home() {
     setNotice("");
     if (!form.phoneNumber.trim() || !form.iccid.trim() || !form.costCentre.trim()) {
       setNotice("Phone number, ICCID and cost centre are required.");
+      return;
+    }
+    if (mode !== "api") {
+      setNotice("The database connection is unavailable. Refresh the inventory before registering a SIM.");
       return;
     }
     const newSim = {
@@ -134,14 +131,6 @@ export default function Home() {
         return;
       }
       setSaving(false);
-    } else {
-      const duplicate = sims.some(sim => sim.iccid === newSim.iccid || sim.phoneNumber === newSim.phoneNumber);
-      if (duplicate) {
-        setNotice("Duplicate ICCID or phone number. Use unique demo values.");
-        return;
-      }
-      setSims(current => [{ ...newSim, id: Math.max(0, ...current.map(item => item.id)) + 1, status: "Available" }, ...current]);
-      setNotice("SIM added to this demo session. Connect the API to persist it in PostgreSQL.");
     }
     setForm({ operator: "Safaricom", phoneNumber: "", iccid: "", planType: "Corporate voice + data", monthlyCost: "1500", costCentre: "" });
     setShowForm(false);
@@ -173,7 +162,7 @@ export default function Home() {
         <div className="content">
           <section className="page-heading" id="overview">
             <div><div className="eyebrow">ASSET MANAGEMENT / SIM REGISTER</div><h1>SIM inventory</h1><p>Track corporate SIM assets, review status and maintain clean inventory records.</p></div>
-            <button className="primary-button" onClick={() => { setShowForm(v => !v); setNotice(""); }}>{showForm ? "Close form" : <><span>＋</span> Register SIM</>}</button>
+            <button className="primary-button" disabled={mode !== "api"} onClick={() => { setShowForm(v => !v); setNotice(""); }}>{showForm ? "Close form" : <><span>＋</span> Register SIM</>}</button>
           </section>
 
           {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification">×</button></div>}
@@ -205,7 +194,7 @@ export default function Home() {
               {filtered.map(sim => <tr key={sim.id}><td><div className="sim-primary">{sim.phoneNumber}</div><div className="sim-secondary">ICCID {sim.iccid}</div></td><td><span className="operator-dot">{sim.operator.slice(0,1)}</span>{sim.operator}</td><td>{sim.planType}</td><td><span className="cost-centre">{sim.costCentre}</span></td><td className="money">{Number(sim.monthlyCost).toLocaleString("en-KE", {style:"currency",currency:"KES",maximumFractionDigits:0})}</td><td><span className={"status-pill " + sim.status.toLowerCase()}><i />{sim.status}</span></td></tr>)}
               {filtered.length === 0 && <tr><td colSpan={6} className="empty-state">No SIM records match these filters.</td></tr>}
             </tbody></table></div>
-            <footer className="table-footer"><span>Showing <strong>{filtered.length}</strong> of <strong>{sims.length}</strong> records</span><span>{mode === "api" ? "Live API data" : "Synthetic demo data"}</span></footer>
+            <footer className="table-footer"><span>Showing <strong>{filtered.length}</strong> of <strong>{sims.length}</strong> records</span><span>{mode === "api" ? "Live database data" : mode === "loading" ? "Connecting to database" : "Database unavailable"}</span></footer>
           </section>
           <footer className="page-footer"><span>SIM Inventory Management System</span><span>Development build · 2026</span></footer>
         </div>
