@@ -48,6 +48,11 @@ jobs:
           cache-dependency-path: src/frontend/package.json
       - name: Install dependencies
         run: npm install
+      - name: Audit frontend dependency tree
+        run: |
+          npm audit --json > /tmp/npm-audit.json || true
+          node -e 'const a=require("/tmp/npm-audit.json"); for (const [name, item] of Object.entries(a.vulnerabilities || {})) console.log(JSON.stringify({name, severity:item.severity, direct:item.isDirect, range:item.range, fixAvailable:item.fixAvailable, via:item.via.map(v => typeof v === "string" ? v : v.title)}))'
+          npm audit --audit-level=high
       - name: Type-check
         run: npm run lint
       - name: Build static frontend
