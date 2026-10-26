@@ -40,6 +40,7 @@ Configure these environment variables in the Render service:
 - `Email__ResendApiKey`: API key from Resend.
 - `Email__FromAddress`: sender address authorized by Resend.
 - `Authentication__JwtSigningKey`: random secret at least 32 bytes.
+- `Authentication__EmailOtpSigningKey`: a separate random secret at least 32 bytes, used to hash OTP codes.
 - `ConnectionStrings__DefaultConnection`: Neon connection string.
 - `Authentication__GoogleClientId`: Google Web OAuth client ID.
 - `Authentication__BootstrapAdminEmail`: first administrator's exact Google email.
@@ -47,12 +48,14 @@ Configure these environment variables in the Render service:
 
 Resend's test sender can only send to the account owner's email address. To send OTPs to other provisioned users, verify a domain you control in Resend and use a sender address on that domain. Check current provider limits before use. Do not configure SMTP on Render Free; outbound SMTP ports are restricted.
 
+The initial bootstrap admin can test the email flow with Resend's test sender if the destination matches the Resend account owner. Invited users will not receive email until a sender domain is verified.
+
 ## Render API service
 
 1. Sign up at Render and connect the GitHub repository.
-2. Create a Web Service using the repository and Dockerfile `src/backend/SimInventory.Api/Dockerfile`.
-3. Choose the Free instance type. Set the root directory to the repository root if asked.
-4. Ensure the service listens on the port provided by Render (the app reads the `PORT` environment variable).
+2. Create a Web Service using the repository. Set the root directory to `src/backend/SimInventory.Api` and the Dockerfile path to `Dockerfile`.
+3. Choose the Free instance type.
+4. Configure the service port as `10000`, matching the Docker image.
 5. Add the environment variables listed above, plus `Authentication__JwtSigningKey`.
 6. Set `Cors__AllowedOrigins` to the exact frontend URL once Cloudflare Pages has created it.
 7. Disable Render's automatic deploy on push if you want GitHub Actions to control deployments. Create a deploy hook and save its URL as the GitHub secret `RENDER_DEPLOY_HOOK_URL`.
