@@ -114,7 +114,7 @@ export default function LoginPage() {
           <p className="auth-copy">
             {stage === "google"
               ? "Use the Google account that an administrator has provisioned for you."
-              : "We will send a six-digit verification code to your email address. Enter it to finish signing in."}
+              : "A six-digit verification code has been sent to your email address. Enter it to finish signing in."}
           </p>
           {email && <p className="auth-account">{email}</p>}
           {stage === "google" && <>
