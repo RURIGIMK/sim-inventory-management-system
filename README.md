@@ -12,7 +12,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 | Hosted database | Neon PostgreSQL |
 | Local database | Docker PostgreSQL |
 | Authentication | Google sign-in for administrator-provisioned accounts |
-| MFA | Authenticator-app TOTP |
+| Verification | Email OTP after Google sign-in |
 | Authorization | API-enforced Administrator, Departmental Manager and Viewer roles |
 | CI | GitHub Actions build, type-check and test |
 | CD | Gated GitHub Actions deployment to Render and Cloudflare Pages |
@@ -48,7 +48,7 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
        dotnet restore
        dotnet run
 
-   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The code contains clearly marked development-only fallback signing/encryption keys, but Google sign-in still needs a valid OAuth client ID.
+   Set `ConnectionStrings__DefaultConnection` if you are not using the local default connection. For local sign-in, configure `Authentication__GoogleClientId`, `Authentication__BootstrapAdminEmail`, `Authentication__JwtSigningKey`, `Email__ResendApiKey` and `Email__FromAddress` as environment variables. The API requires an email provider API key and sender address to send codes. Google sign-in still needs a valid OAuth client ID.
 
 3. In another terminal, configure and run the frontend:
 
@@ -76,9 +76,9 @@ New accounts should normally be created as Viewer and elevated only when justifi
 
 | Method | Route | Access |
 | --- | --- | --- |
-| POST | `/api/auth/google` | Public, validates Google ID token and starts MFA |
-| POST | `/api/auth/mfa/setup` | MFA setup challenge |
-| POST | `/api/auth/otp` | MFA challenge |
+| POST | `/api/auth/google` | Public, validates Google ID token and sends email OTP |
+
+| POST | `/api/auth/otp` | Verify email OTP challenge |
 | GET | `/api/auth/me` | Authenticated session |
 | GET / POST | `/api/admin/users` | Administrator |
 | PUT | `/api/admin/users/{id}` | Administrator |
@@ -93,11 +93,11 @@ New accounts should normally be created as Viewer and elevated only when justifi
 
 ## Data handling
 
-Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, MFA encryption keys, access tokens or actual organizational data.
+Only synthetic data belongs in this repository. Example employee numbers, phone numbers and ICCIDs must not be associated with real people or operator accounts. Do not commit Google credentials, Neon URLs, JWT keys, email OTP signing keys, access tokens or actual organizational data.
 
 ## Deployment
 
-Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by the `DEPLOY_ENABLED` repository variable and requires secrets and variables for Google Cloud Workload Identity Federation, Cloud Run, Neon and Cloudflare Pages.
+Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by the `DEPLOY_ENABLED` repository variable and requires a Render deploy hook, Cloudflare Pages credentials, Google OAuth Client ID and repository variables. Neon, email-provider and signing keys are configured in Render.
 
 - [Technical specification and acceptance criteria](docs/TECHNICAL_SPECIFICATION.md)
 - [Security design and limitations](docs/SECURITY.md)
