@@ -9,6 +9,8 @@ using SimInventory.Api.Data;
 using SimInventory.Api.Models;
 using SimInventory.Api.Security;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,6 +76,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         }
     };
 });
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = 10;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+        limiter.AutoReplenishment = true;
+    });
+});
+
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Session", policy => policy.RequireAuthenticatedUser()
@@ -97,7 +111,9 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
 var app = builder.Build();
 
 // Cloud Run terminates public HTTPS at its edge; local development may use HTTP.
+app.UseRouting();
 app.UseCors("Frontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -177,7 +193,7 @@ app.MapPost("/api/auth/google", async (
     var secret = protector.Unprotect(user.ProtectedTotpSecret);
     return Results.Ok(new AuthResponse("mfa_setup_required", tokens.CreateToken(user, "mfa_setup", 10),
         user.Email, user.DisplayName, user.Role.ToString(), TotpHelper.SetupUri(user.Email, secret), secret));
-});
+}).RequireRateLimiting("auth");
 
 app.MapPost("/api/auth/mfa/setup", async (TotpRequest request, ClaimsPrincipal principal,
     SimInventoryDbContext db, TokenService tokens, TotpSecretProtector protector) =>
@@ -193,7 +209,7 @@ app.MapPost("/api/auth/mfa/setup", async (TotpRequest request, ClaimsPrincipal p
     await AuditWriter.WriteAsync(db, principal, "mfa_enabled", "user", user.Id.ToString(), "{}");
     await db.SaveChangesAsync();
     return Results.Ok(new AuthResponse("authenticated", tokens.CreateToken(user), user.Email, user.DisplayName, user.Role.ToString()));
-}).RequireAuthorization("MfaSetup");
+}).RequireAuthorization("MfaSetup").RequireRateLimiting("auth");
 
 app.MapPost("/api/auth/otp", async (TotpRequest request, ClaimsPrincipal principal,
     SimInventoryDbContext db, TokenService tokens, TotpSecretProtector protector) =>
@@ -204,7 +220,7 @@ app.MapPost("/api/auth/otp", async (TotpRequest request, ClaimsPrincipal princip
     if (!TotpHelper.Verify(protector.Unprotect(user.ProtectedTotpSecret), request.Code))
         return Results.BadRequest(new { message = "Invalid or expired one-time code." });
     return Results.Ok(new AuthResponse("authenticated", tokens.CreateToken(user), user.Email, user.DisplayName, user.Role.ToString()));
-}).RequireAuthorization("MfaChallenge");
+}).RequireAuthorization("MfaChallenge").RequireRateLimiting("auth");
 
 app.MapGet("/api/auth/me", async (ClaimsPrincipal principal, SimInventoryDbContext db) =>
 {
