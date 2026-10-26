@@ -135,8 +135,6 @@ using (var scope = app.Services.CreateScope())
             "UpdatedAt" timestamptz NOT NULL, "DisabledAt" timestamptz NULL
         );
         CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Email" ON "Users" ("Email");
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "TotpEnabled" boolean NOT NULL DEFAULT false;
-        ALTER TABLE "Users" ALTER COLUMN "TotpEnabled" SET DEFAULT false;
         """);
     await db.Database.ExecuteSqlRawAsync("""
         CREATE TABLE IF NOT EXISTS "Employees" (
