@@ -19,11 +19,14 @@ public static class DemoDataSeeder
     public static async Task SeedAsync(SimInventoryDbContext db)
     {
         var costCentres = new[] { "OPS-014", "FIN-021", "HR-008", "ICT-003", "PROC-011", "CS-017" };
+        var employeeNumbers = (await db.Employees.Select(x => x.EmployeeNumber).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingIccids = (await db.Sims.Select(x => x.Iccid).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingPhoneNumbers = (await db.Sims.Select(x => x.PhoneNumber).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         for (var index = 1; index <= 30; index++)
         {
             var employeeNumber = $"DEMO-EMP-{index:000}";
-            if (!await db.Employees.AnyAsync(x => x.EmployeeNumber == employeeNumber))
+            if (employeeNumbers.Add(employeeNumber))
             {
                 var departmentIndex = (index - 1) % Departments.Length;
                 db.Employees.Add(new Employee
@@ -39,7 +42,7 @@ public static class DemoDataSeeder
 
             var iccid = $"DEMO-ICCID-{index:000000}";
             var phoneNumber = $"DEMO-NUMBER-{index:0000}";
-            if (!await db.Sims.AnyAsync(x => x.Iccid == iccid || x.PhoneNumber == phoneNumber))
+            if (!existingIccids.Contains(iccid) && !existingPhoneNumbers.Contains(phoneNumber))
             {
                 var operatorName = (index % 3) switch
                 {
