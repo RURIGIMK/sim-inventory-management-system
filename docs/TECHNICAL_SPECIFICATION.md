@@ -10,10 +10,10 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 - API: ASP.NET Core 8, C# and Entity Framework Core.
 - Database: Neon PostgreSQL for hosted persistence; Docker PostgreSQL for local work.
 - Identity: Google sign-in matched to administrator-provisioned accounts.
-- MFA: authenticator-app TOTP, required for every account.
+- Verification: six-digit email OTP after Google sign-in, required for every sign-in.
 - Roles: Administrator, Departmental Manager, Viewer.
 - CI/CD: GitHub Actions, with deployments gated by repository configuration.
-- API host: Google Cloud Run candidate.
+- API host: Render Free Web Service for prototype deployments.
 - Audit: append-only application behavior with hash-linked event records.
 - Optional analytics: separate Colab proof of concept on synthetic data.
 
@@ -21,8 +21,8 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 
 - An unknown Google email is rejected unless it matches the configured bootstrap administrator email.
 - A provisioned Google account must pass Google token validation and verified-email checks.
-- A new account must enrol TOTP before accessing protected APIs.
-- A returning user must complete TOTP verification.
+- Every successful Google sign-in must be followed by a valid email OTP before accessing protected APIs.
+- OTP codes expire after five minutes, allow at most five attempts and are invalidated after use.
 - A disabled account cannot access protected APIs, including with a previously issued token.
 - Administrators can create accounts, change roles, disable and re-enable accounts through the application.
 - New accounts default to Viewer unless the administrator explicitly selects another role.
@@ -53,7 +53,7 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 - A failed validation fails the workflow.
 - Deployment is not attempted until `DEPLOY_ENABLED=true` and required secrets/variables are configured.
 - The frontend is deployed as a static export to Cloudflare Pages.
-- The API is deployed as a .NET container to Cloud Run.
+- The API is deployed as a .NET container to Render; the static frontend is hosted on Cloudflare Pages.
 - Neon credentials are passed only to the API runtime and never exposed to frontend bundles.
 - No deployment workflow contains hardcoded credentials.
 
