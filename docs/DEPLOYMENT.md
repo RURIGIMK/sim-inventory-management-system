@@ -29,26 +29,19 @@ The prototype currently uses EF Core `EnsureCreatedAsync`. Before any production
 3. Configure `Authentication__GoogleClientId` in Render and `GOOGLE_OAUTH_CLIENT_ID` as a GitHub Actions secret for frontend builds.
 4. Set `Authentication__BootstrapAdminEmail` in Render to the exact Google email for the first administrator.
 5. The first sign-in creates that administrator only when the database has no user records. After bootstrap, all other users must be provisioned by an administrator.
-6. After Google verifies identity, the API emails a six-digit OTP. Codes expire in five minutes and are limited to five attempts.
+6. After the bootstrap administrator signs in, they can approve additional Google email addresses in User administration. Approved users sign in directly with Google.
 
-## Email OTP provider
+## Render environment variables
 
-The API uses the Resend email API over HTTPS. It does not use authenticator apps or SMTP.
+Configure these variables in the Render service:
 
-Configure these environment variables in the Render service:
-
-- `Email__ResendApiKey`: API key from Resend.
-- `Email__FromAddress`: sender address authorized by Resend.
 - `Authentication__JwtSigningKey`: random secret at least 32 bytes.
-- `Authentication__EmailOtpSigningKey`: a separate random secret at least 32 bytes, used to hash OTP codes.
 - `ConnectionStrings__DefaultConnection`: Neon connection string.
 - `Authentication__GoogleClientId`: Google Web OAuth client ID.
 - `Authentication__BootstrapAdminEmail`: first administrator's exact Google email.
 - `Cors__AllowedOrigins`: exact Cloudflare Pages origin, without a trailing slash.
 
-Resend's test sender can only send to the account owner's email address. To send OTPs to other provisioned users, verify a domain you control in Resend and use a sender address on that domain. Check current provider limits before use. Do not configure SMTP on Render Free; outbound SMTP ports are restricted.
-
-The initial bootstrap admin can test the email flow with Resend's test sender if the destination matches the Resend account owner. Invited users will not receive email until a sender domain is verified.
+No email provider, sender domain or OTP signing key is required.
 
 ## Render API service
 
@@ -90,7 +83,7 @@ Variables:
 - `CLOUDFLARE_PAGES_PROJECT`: exact Pages project name.
 - `CORS_ALLOWED_ORIGINS`: exact Pages origin.
 
-The Render environment variables are configured in Render's dashboard, not copied into GitHub Actions. Keep Neon credentials, Resend API key and signing keys out of GitHub source code and frontend build variables.
+The Render environment variables are configured in Render's dashboard, not copied into GitHub Actions. Keep Neon credentials and signing keys out of GitHub source code and frontend build variables.
 
 ## Deploy flow
 
@@ -102,7 +95,6 @@ The Render environment variables are configured in Render's dashboard, not copie
 ## Security and limitations
 
 - Use synthetic data only.
-- Never expose Neon or Resend secrets to the frontend.
-- OTP hashes, expiry and attempt counts are stored server-side; raw codes are never stored.
+- Never expose Neon credentials or signing keys to the frontend.
 - Hash-linked audit events are tamper-evident, not absolutely immutable.
 - Configure versioned database migrations, backup/restore, monitoring, session hardening and security review before any real-data deployment.
