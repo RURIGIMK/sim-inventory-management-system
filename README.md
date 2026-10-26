@@ -77,7 +77,6 @@ New accounts should normally be created as Viewer and elevated only when justifi
 | Method | Route | Access |
 | --- | --- | --- |
 | POST | `/api/auth/google` | Public, validates Google ID token and sends email OTP |
-
 | POST | `/api/auth/otp` | Verify email OTP challenge |
 | GET | `/api/auth/me` | Authenticated session |
 | GET / POST | `/api/admin/users` | Administrator |
