@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SimInventory.Api.Data;
 using SimInventory.Api.Models;
 
-namespace SimInventory.Api;
+namespace SimInventory.Api.Data;
 
 /// <summary>
 /// Adds clearly synthetic records to an empty demo inventory without deleting or
