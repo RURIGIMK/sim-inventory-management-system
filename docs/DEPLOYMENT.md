@@ -89,8 +89,8 @@ The Render environment variables are configured in Render's dashboard, not copie
 
 1. A push or pull request runs CI: backend build/tests, frontend audit, type-check and build.
 2. Once configured, set `DEPLOY_ENABLED=true`.
-3. A push to `main` or manual workflow run triggers Render's deploy hook and builds/deploys the static frontend to Cloudflare Pages.
-4. Verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` and the Cloudflare Pages URL.
+3. A push to `main` or manual workflow run triggers Render's deploy hook, builds the static frontend and waits up to 10 minutes for `/api/health` to return HTTP 200 before uploading the frontend. If the API does not become healthy, the workflow stops before the frontend deploy.
+4. After the workflow succeeds, verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` and the Cloudflare Pages URL.
 
 ## Security and limitations
 
