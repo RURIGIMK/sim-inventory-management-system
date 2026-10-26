@@ -41,7 +41,7 @@ Configure these variables in the Render service:
 - `Authentication__BootstrapAdminEmail`: first administrator's exact Google email.
 - `Cors__AllowedOrigins`: exact Cloudflare Pages origin, without a trailing slash.
 
-No email provider, sender domain or OTP signing key is required.
+No email provider or sender domain is required.
 
 ## Render API service
 
