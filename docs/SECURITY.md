@@ -10,6 +10,7 @@
 - API authorization is enforced server-side. Hiding a frontend control is not a security boundary.
 - The API checks account status on authenticated requests, so disabled users are rejected even if they still possess an unexpired token.
 - The last active administrator cannot be demoted or disabled, and an administrator cannot disable their own account.
+- Rejected Google sign-ins are written to the audit trail with a reason category. Submitted Google credentials are never written to the log.
 
 ## Roles
 
@@ -38,5 +39,5 @@ Before production, strengthen the design with database roles that deny applicati
 
 - Only synthetic data is allowed in public repository examples and automated tests.
 - Do not import employee records or live operator usage/billing information without written authorization, a defined purpose, data minimization, access controls, retention rules and a privacy assessment.
-- Never put authentication tokens, phone numbers, ICCIDs or personal information in logs.
+- Never log raw Google credentials, JWTs or signing secrets. Audit actor emails and account identifiers are retained for accountability; avoid adding phone numbers or ICCIDs to audit details unless necessary. Define access and retention rules before real-data use.
 - The API applies a basic fixed-window rate limit to Google sign-in. Before production, review per-client throttling behind the host proxy, alerting, lockout/recovery policy, monitoring, strict CORS origins and additional abuse protections.
