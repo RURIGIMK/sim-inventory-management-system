@@ -1,84 +1,105 @@
-# Deployment and Environment Setup
+# Zero-budget deployment and environment setup
 
-This is a student prototype. Use synthetic records only until an organization explicitly authorizes real-data processing and the security review is complete.
+This is an academic prototype. Use synthetic records only until an organization explicitly authorizes real-data processing and a security review is complete.
 
 ## Target architecture
 
-- Frontend: Next.js static export deployed to Cloudflare Pages.
-- API: .NET 8 container deployed to Google Cloud Run.
-- Persistent relational database: Neon PostgreSQL.
-- CI: GitHub Actions on pushes and pull requests.
-- CD: GitHub Actions deploys only after repository deployment configuration is explicitly enabled.
+- Frontend: Next.js static export on Cloudflare Pages Free.
+- API: .NET 8 container on Render Free Web Service.
+- Database: Neon PostgreSQL Free.
+- CI/CD: GitHub Actions. CI runs on pushes and pull requests. CD is gated by the repository variable `DEPLOY_ENABLED=true`.
 - Local development: Docker Compose PostgreSQL and local .NET/Next.js processes.
 
-The free tiers and their limits can change. Cloud Run may require a billing-enabled Google Cloud project, and Neon or Cloudflare quotas may limit or suspend service. “Free tier” is not a guarantee of permanent zero cost.
+This is a zero-cash-cost target, not a production availability guarantee. Render Free services sleep after 15 minutes without traffic and may take about a minute to wake. Free quotas and policies can change. Do not use free hosting for sensitive real employee data or production workloads.
 
 ## Neon PostgreSQL
 
-1. Create a Neon project and database for this application.
-2. Copy the pooled or direct connection string from Neon. Use the TLS-enabled connection string supplied by Neon.
-3. Save it as the GitHub Actions repository secret `NEON_CONNECTION_STRING`.
-4. For local API runs, set `ConnectionStrings__DefaultConnection` in your shell or local user-secrets. Do not commit the real value.
-5. Keep local Docker PostgreSQL for development. Do not point tests or local experiments at the production Neon database.
+1. Use the `sim_inventory` database on the Neon project.
+2. Copy a TLS-enabled connection string privately.
+3. Configure it in Render as `ConnectionStrings__DefaultConnection`.
+4. Keep local Docker PostgreSQL for development. Do not point tests at the Neon database.
+5. Never put the connection string in the frontend or commit it to GitHub.
 
-The application currently calls EF Core `EnsureCreatedAsync` to make a first demo deployment easy. This is not a migration strategy. Before production or any real organizational data, replace this with reviewed, versioned EF Core migrations, a controlled migration step, backup/restore tests and a documented rollback plan.
+The prototype currently uses EF Core `EnsureCreatedAsync`. Before any production or real-data use, replace this with reviewed EF Core migrations, backups, restore tests and a rollback plan.
 
-## Google OAuth and bootstrap administrator
+## Google sign-in and administrator bootstrap
 
-1. In Google Cloud Console, create an OAuth client ID for a Web application.
-2. Add local JavaScript origin `http://localhost:3000` and the final Cloudflare Pages/custom-domain origin to Authorized JavaScript origins.
-3. Set the same client ID in GitHub secret `GOOGLE_OAUTH_CLIENT_ID` and frontend build environment `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-4. Set `BOOTSTRAP_ADMIN_EMAIL` to the exact Google email of the initial administrator.
-5. Sign in once with that account. The API creates this one initial administrator if no user record exists. Thereafter, only administrators can provision additional accounts.
-6. The first sign-in requires authenticator-app TOTP enrolment. Later sign-ins require a fresh six-digit code.
+1. Use the existing Google Web OAuth client.
+2. Add `http://localhost:3000` and the final Cloudflare Pages URL as Authorized JavaScript origins.
+3. Configure `Authentication__GoogleClientId` in Render and `GOOGLE_OAUTH_CLIENT_ID` as a GitHub Actions secret for frontend builds.
+4. Set `Authentication__BootstrapAdminEmail` in Render to the exact Google email for the first administrator.
+5. The first sign-in creates that administrator only when no matching account exists and the database has no matching user. All other users must be provisioned by an administrator.
+6. After Google verifies identity, the API emails a six-digit OTP. Codes expire in five minutes and are limited to five attempts.
 
-Google sign-in verifies identity; it does not grant access by itself. An account must already exist in the application, except for the explicitly configured first administrator. Use a Google OAuth client owned by the project owner, not a personal test client in production.
+## Email OTP provider
 
-## GitHub Actions secrets
+The API uses the Resend email API over HTTPS. It does not use authenticator apps or SMTP.
 
-Create these under repository Settings > Secrets and variables > Actions > Secrets:
+Configure these environment variables in the Render service:
 
-- `GOOGLE_OAUTH_CLIENT_ID`: Google Web OAuth client ID.
-- `BOOTSTRAP_ADMIN_EMAIL`: initial administrator's Google email.
-- `JWT_SIGNING_KEY`: cryptographically random string, at least 32 bytes.
-- `MFA_ENCRYPTION_KEY`: base64 representation of exactly 32 random bytes.
-- `NEON_CONNECTION_STRING`: Neon PostgreSQL connection string.
-- `GOOGLE_WORKLOAD_IDENTITY_PROVIDER`: Google Workload Identity Federation provider resource name.
-- `GOOGLE_SERVICE_ACCOUNT`: deployment service account email.
-- `GOOGLE_CLOUD_PROJECT`: Google Cloud project ID.
-- `CLOUDFLARE_API_TOKEN`: scoped token allowed to deploy the target Pages project.
-- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID.
+- `Email__ResendApiKey`: API key from Resend.
+- `Email__FromAddress`: sender address authorized by Resend.
+- `Authentication__JwtSigningKey`: random secret at least 32 bytes.
+- `ConnectionStrings__DefaultConnection`: Neon connection string.
+- `Authentication__GoogleClientId`: Google Web OAuth client ID.
+- `Authentication__BootstrapAdminEmail`: first administrator's exact Google email.
+- `Cors__AllowedOrigins`: exact Cloudflare Pages origin, without a trailing slash.
 
-Set these under repository Settings > Secrets and variables > Actions > Variables:
+Resend's test sender can only send to the account owner's email address. To send OTPs to other provisioned users, verify a domain you control in Resend and use a sender address on that domain. Check current provider limits before use. Do not configure SMTP on Render Free; outbound SMTP ports are restricted.
 
-- `DEPLOY_ENABLED`: set to `true` only after all deployment prerequisites are configured.
-- `CLOUD_RUN_REGION`: chosen Cloud Run region.
-- `CLOUD_RUN_SERVICE`: service name, for example `sim-inventory-api`.
-- `CLOUDFLARE_PAGES_PROJECT`: existing Pages project name.
-- `CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins, without a trailing slash.
+## Render API service
 
-Generate secrets locally rather than inventing values or committing them:
+1. Sign up at Render and connect the GitHub repository.
+2. Create a Web Service using the repository and Dockerfile `src/backend/SimInventory.Api/Dockerfile`.
+3. Choose the Free instance type. Set the root directory to the repository root if asked.
+4. Ensure the service listens on the port provided by Render (the app reads the `PORT` environment variable).
+5. Add the environment variables listed above, plus `Authentication__JwtSigningKey`.
+6. Set `Cors__AllowedOrigins` to the exact frontend URL once Cloudflare Pages has created it.
+7. Disable Render's automatic deploy on push if you want GitHub Actions to control deployments. Create a deploy hook and save its URL as the GitHub secret `RENDER_DEPLOY_HOOK_URL`.
+8. Record the API URL, such as `https://your-service.onrender.com`, and save it as the GitHub Actions variable `RENDER_API_BASE_URL`.
 
-- JWT signing key: `openssl rand -hex 32` (store the output as `JWT_SIGNING_KEY`).
-- MFA encryption key: `openssl rand -base64 32` (store the output as `MFA_ENCRYPTION_KEY`).
+Render Free Web Services sleep after 15 minutes of inactivity, have limited compute and may be suspended at quota limits. The first request after sleep may be slow.
 
-The workflow uses Google Workload Identity Federation rather than a long-lived service-account JSON key. Configure the provider to trust only this repository and the intended branch/environment, and grant only the permissions needed for Cloud Run deployment and Cloud Build.
+## Cloudflare Pages frontend
 
-## Deploy sequence
+1. Create a Pages project named `sim-inventory-management`.
+2. Use Direct Upload because GitHub Actions builds the static export and uploads it with Wrangler.
+3. Create a scoped Cloudflare API token for Pages deployment.
+4. Save `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as GitHub Actions secrets.
+5. Save the exact Pages project name as the variable `CLOUDFLARE_PAGES_PROJECT`.
+6. Add the final Pages URL to Google OAuth Authorized JavaScript origins and to Render's `Cors__AllowedOrigins`.
 
-1. Merge reviewed changes to `main). CI runs on pull requests and pushes.
-2. Configure the secrets and variables above.
-3. Set `DEPLOY_ENABLED=true` only after the API URL, OAuth origins and CORS origin are correct.
-4. Run the `Deploy` workflow manually once to validate the setup. The workflow deploys the API first, discovers its Cloud Run URL, then injects that URL into the frontend build. You do not need to guess or preconfigure the API URL.
-5. Subsequent pushes to `main` deploy automatically while `DEPLOY_ENABLED=true`.
+## GitHub Actions configuration
 
-Cloud Run's first deployment may need a manual one-time bootstrap for API enablement, Workload Identity Federation, service-account permissions and the Cloud Run service identity. Those actions require the project owner's Google Cloud and Cloudflare accounts.
+Repository Settings > Secrets and variables > Actions.
 
-## Operational safeguards
+Secrets:
 
-- Never use actual employee records, phone numbers, ICCIDs or operator credentials in CI.
-- Do not place Neon credentials in frontend environment variables.
-- CORS is not authentication. The API independently validates tokens and authorization.
-- Keep JWT and MFA encryption keys stable across instances and deployments. Rotating them invalidates tokens or requires a planned MFA-secret re-enrolment.
-- Back up Neon data and test restoration. Database retention and backup features vary by plan.
-- Confirm data location, privacy requirements, retention, incident response and written authorization before any organizational pilot.
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `RENDER_DEPLOY_HOOK_URL`
+
+Variables:
+
+- `DEPLOY_ENABLED`: keep `false` until all external services are configured.
+- `RENDER_API_BASE_URL`: the Render service's HTTPS URL.
+- `CLOUDFLARE_PAGES_PROJECT`: exact Pages project name.
+- `CORS_ALLOWED_ORIGINS`: exact Pages origin.
+
+The Render environment variables are configured in Render's dashboard, not copied into GitHub Actions. Keep Neon credentials, Resend API key and signing keys out of GitHub source code and frontend build variables.
+
+## Deploy flow
+
+1. A push or pull request runs CI: backend build/tests, frontend audit, type-check and build.
+2. Once configured, set `DEPLOY_ENABLED=true`.
+3. A push to `main` or manual workflow run triggers Render's deploy hook and builds/deploys the static frontend to Cloudflare Pages.
+4. Verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` and the Cloudflare Pages URL.
+
+## Security and limitations
+
+- Use synthetic data only.
+- Never expose Neon or Resend secrets to the frontend.
+- OTP hashes, expiry and attempt counts are stored server-side; raw codes are never stored.
+- Hash-linked audit events are tamper-evident, not absolutely immutable.
+- Configure versioned database migrations, backup/restore, monitoring, session hardening and security review before any real-data deployment.
