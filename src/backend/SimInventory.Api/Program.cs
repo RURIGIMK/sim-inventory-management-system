@@ -144,6 +144,8 @@ using (var scope = app.Services.CreateScope())
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpExpiresAt" timestamptz NULL;
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpAttempts" integer NOT NULL DEFAULT 0;
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "EmailOtpSentAt" timestamptz NULL;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "TotpEnabled" boolean NOT NULL DEFAULT false;
+        ALTER TABLE "Users" ALTER COLUMN "TotpEnabled" SET DEFAULT false;
         """);
     await db.Database.ExecuteSqlRawAsync("""
         CREATE TABLE IF NOT EXISTS "Employees" (
@@ -205,7 +207,7 @@ app.MapPost("/api/auth/google", async (
     if (user is null)
     {
         var bootstrapEmail = configuration["Authentication:BootstrapAdminEmail"]?.Trim().ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(bootstrapEmail) || email != bootstrapEmail)
+        if (string.IsNullOrWhiteSpace(bootstrapEmail) || email != bootstrapEmail || await db.Users.AnyAsync())
             return Results.Json(new { message = "This Google account has not been provisioned. Ask an administrator to create it." },
                 statusCode: StatusCodes.Status403Forbidden);
 
@@ -229,12 +231,18 @@ app.MapPost("/api/auth/google", async (
     if (string.IsNullOrWhiteSpace(otpSigningKey) || Encoding.UTF8.GetByteCount(otpSigningKey) < 32)
         return Results.Problem("Email verification is not configured correctly.", statusCode: 503);
 
+    var now = DateTimeOffset.UtcNow;
+    if (user.EmailOtpCodeHash is not null && user.EmailOtpSentAt is not null &&
+        now - user.EmailOtpSentAt < TimeSpan.FromSeconds(60))
+        return Results.Json(new { message = "A code was sent recently. Wait one minute before requesting another." },
+            statusCode: StatusCodes.Status429TooManyRequests);
+
     var code = EmailOtpHelper.CreateCode();
     user.EmailOtpCodeHash = EmailOtpHelper.Hash(user.Id, code, otpSigningKey);
     user.EmailOtpExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
     user.EmailOtpAttempts = 0;
-    user.EmailOtpSentAt = DateTimeOffset.UtcNow;
-    user.UpdatedAt = DateTimeOffset.UtcNow;
+    user.EmailOtpSentAt = now;
+    user.UpdatedAt = now;
     await db.SaveChangesAsync();
 
     try
@@ -246,6 +254,7 @@ app.MapPost("/api/auth/google", async (
         user.EmailOtpCodeHash = null;
         user.EmailOtpExpiresAt = null;
         user.EmailOtpAttempts = 0;
+        user.EmailOtpSentAt = null;
         await db.SaveChangesAsync();
         return Results.Problem("We could not send your email code. The email service may not be configured yet.", statusCode: 503);
     }
@@ -301,6 +310,7 @@ app.MapPost("/api/auth/otp", async (
     user.EmailOtpCodeHash = null;
     user.EmailOtpExpiresAt = null;
     user.EmailOtpAttempts = 0;
+    user.EmailOtpSentAt = null;
     user.UpdatedAt = DateTimeOffset.UtcNow;
     await AuditWriter.WriteAsync(db, principal, "login_email_otp_verified", "user", user.Id.ToString(), "{}");
     await db.SaveChangesAsync();
