@@ -12,14 +12,19 @@ Deliver a coherent, tested and publicly demonstrable academic prototype. Priorit
 4. Fix important defects and add automated tests for the rules most likely to regress.
 5. Keep the database bootstrap limitation visible. Reviewed EF Core migrations and a backup/restore drill remain production hardening, not a reason to pretend the prototype is production-ready.
 
-## Workstream 2: Add a small, explainable intelligence capability
+## Workstream 2: Explainable intelligence capability
 
-Start with deterministic rules using fields the system already stores. Candidate alerts:
-- A SIM remains assigned to an employee who is inactive or terminated. The API already blocks this transition, so the alert is most useful for identifying legacy or inconsistent records and should not duplicate a rule that is already reliably enforced.
-- A monthly SIM cost is unusually high compared with a suitable peer baseline, such as other SIMs on the same operator, only when there are enough peer records to make the comparison meaningful.
-- A record needs an administrative review because of a clearly defined asset-control condition.
+The feature branch now implements deterministic rules and an authenticated `GET /api/intelligence/alerts` endpoint, plus an `/intelligence` view. The rules flag:
+- Monthly SIM costs that are unusually high against same-operator peers, when at least four peers are available.
+- Contract end dates that have passed or are within 30 days.
+- A SIM marked Allocated without an active assignment.
+- An active assignment while the SIM status disagrees.
+- Multiple active assignments for one SIM.
+- An active assignment to an inactive or terminated employee.
 
-Each alert should show the affected record, the rule that triggered it, the values used and a suggested human review action. Do not show an arbitrary confidence percentage, call a rule an AI prediction, or automatically disable a SIM or change a user's access.
+Cost checks use a robust median/MAD threshold with a 50% median floor. When there are too few peers, the service skips the comparison rather than inventing a baseline. Each alert shows the affected record, rule, evidence and suggested human review action.
+
+These are deterministic review flags, not AI predictions. They must not automatically disable SIMs or change account access. Before merging, verify CI and inspect the results. Unit tests cover the rule logic; the live API and UI still require manual integration checks.
 
 ### Optional ML experiment
 
