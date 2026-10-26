@@ -343,7 +343,7 @@ app.MapPost("/api/sims", async (Sim sim, ClaimsPrincipal principal, SimInventory
     db.Sims.Add(sim);
     await db.SaveChangesAsync();
     await AuditWriter.WriteAsync(db, principal, "sim_registered", "sim", sim.Id.ToString(),
-        System.Text.Json.JsonSerializer.Serialize(new { sim.Iccid, sim.PhoneNumber, sim.Operator }));
+        System.Text.Json.JsonSerializer.Serialize(new { sim.Operator, sim.PlanType, sim.CostCentre }));
     await db.SaveChangesAsync();
     return Results.Created($"/api/sims/{sim.Id}", sim);
 }).RequireAuthorization("Managers");
