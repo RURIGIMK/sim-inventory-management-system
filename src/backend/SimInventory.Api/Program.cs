@@ -316,6 +316,75 @@ app.MapGet("/api/admin/audit", async (SimInventoryDbContext db) =>
         .Select(x => new { x.Id, x.ActorEmail, x.Action, x.EntityType, x.EntityId, x.Details, x.CreatedAt, x.PreviousHash, x.Hash })
         .ToListAsync())).RequireAuthorization("Administrators");
 
+app.MapGet("/api/reports/summary", async (SimInventoryDbContext db) =>
+{
+    var sims = await db.Sims.AsNoTracking().ToListAsync();
+    var employees = await db.Employees.AsNoTracking().ToListAsync();
+    var assignments = await db.Assignments.AsNoTracking()
+        .Include(x => x.Sim).Include(x => x.Employee)
+        .OrderByDescending(x => x.AssignedAt).ToListAsync();
+
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var activeSims = sims.Where(x => x.Status != SimStatus.Deactivated).ToList();
+    var activeAssignments = assignments.Where(x => x.ReturnedAt == null).ToList();
+    var byOperator = sims.GroupBy(x => string.IsNullOrWhiteSpace(x.Operator) ? "Unspecified" : x.Operator)
+        .Select(group => new
+        {
+            name = group.Key, simCount = group.Count(),
+            monthlyCost = group.Where(x => x.Status != SimStatus.Deactivated).Sum(x => x.MonthlyCost),
+            allocated = group.Count(x => x.Status == SimStatus.Allocated),
+            available = group.Count(x => x.Status == SimStatus.Available)
+        }).OrderByDescending(x => x.monthlyCost).ToList();
+    var byCostCentre = sims.GroupBy(x => string.IsNullOrWhiteSpace(x.CostCentre) ? "Unspecified" : x.CostCentre)
+        .Select(group => new
+        {
+            name = group.Key, simCount = group.Count(),
+            monthlyCost = group.Where(x => x.Status != SimStatus.Deactivated).Sum(x => x.MonthlyCost),
+            allocated = group.Count(x => x.Status == SimStatus.Allocated),
+            available = group.Count(x => x.Status == SimStatus.Available)
+        }).OrderByDescending(x => x.monthlyCost).ToList();
+    var recentAssignments = assignments.Take(100).Select(x => new
+    {
+        x.Id, simPhoneNumber = x.Sim.PhoneNumber, x.Sim.Operator,
+        employeeNumber = x.Employee.EmployeeNumber, employeeName = x.Employee.FullName,
+        x.AssignedAt, x.ReturnedAt, isActive = x.ReturnedAt == null
+    }).ToList();
+
+    return Results.Ok(new
+    {
+        generatedOn = DateTimeOffset.UtcNow,
+        inventory = new
+        {
+            total = sims.Count,
+            active = activeSims.Count,
+            available = sims.Count(x => x.Status == SimStatus.Available),
+            allocated = sims.Count(x => x.Status == SimStatus.Allocated),
+            suspended = sims.Count(x => x.Status == SimStatus.Suspended),
+            deactivated = sims.Count(x => x.Status == SimStatus.Deactivated),
+            monthlyCommittedCost = activeSims.Sum(x => x.MonthlyCost)
+        },
+        employees = new
+        {
+            total = employees.Count,
+            active = employees.Count(x => x.Status == EmploymentStatus.Active),
+            inactive = employees.Count(x => x.Status != EmploymentStatus.Active)
+        },
+        allocations = new
+        {
+            active = activeAssignments.Count,
+            historical = assignments.Count,
+            returned = assignments.Count(x => x.ReturnedAt != null)
+        },
+        contracts = new
+        {
+            overdue = activeSims.Count(x => x.ContractEnd.HasValue && x.ContractEnd.Value < today),
+            expiringWithin30Days = activeSims.Count(x => x.ContractEnd.HasValue &&
+                x.ContractEnd.Value >= today && x.ContractEnd.Value <= today.AddDays(30))
+        },
+        byOperator, byCostCentre, recentAssignments
+    });
+}).RequireAuthorization("Session");
+
 app.MapGet("/api/intelligence/alerts", async (SimInventoryDbContext db) =>
 {
     var sims = await db.Sims.AsNoTracking().ToListAsync();

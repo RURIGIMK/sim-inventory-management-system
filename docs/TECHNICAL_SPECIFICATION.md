@@ -69,8 +69,17 @@ Provide a web-based organizational SIM asset register with controlled access, tr
 - Pull requests must pass CI before merging.
 - Use `develop` only if the project needs a persistent integration branch; do not create unused branches for appearances.
 
+## Reporting acceptance criteria
+
+- An authenticated user can retrieve inventory totals by status and monthly committed cost.
+- Reports group SIM count and monthly committed cost by operator and cost centre.
+- Reports show employee totals, allocation counts and contract expiry counts.
+- Reports include the latest 100 allocation history records, including returned assignments.
+- The Reports page exports the displayed report data as CSV.
+- Report values are explicitly described as current database records, not verified operator invoices or historical billing statements.
+
 ## Known non-goals / remaining work
 
-- The current branch includes employee directory CRUD/status management, SIM allocation/return/reassignment, a basic audit viewer and hash-chain verification, account administration, authentication rate limiting and deployment scaffolding.
-- Reporting exports, broader automated business-rule/security tests, secure HttpOnly session cookies, full XSS/CSRF review, reviewed versioned database migrations, backups/restore drills and formal privacy/security review remain required before a production pilot.
-- Machine learning remains an optional experiment and must not be represented as a deployed capability.
+- The current branch includes employee directory read/status management, SIM allocation/return/reassignment, audit viewing and hash-chain verification, account administration, authentication rate limiting, reporting snapshot and CSV export, and deployment scaffolding.
+- Historical month-by-month financial reporting, invoice reconciliation, broader automated business-rule/security tests, secure HttpOnly session cookies, full XSS/CSRF review, reviewed versioned database migrations, backups/restore drills and formal privacy/security review remain outside the current implementation or required before a production pilot.
+- Machine learning remains a separate synthetic-data Google Colab experiment and must not be represented as a model deployed in the application.
