@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-SERVICE_DIR = Path(__file__).resolve().parents[1] / "src" / "ml-service"
+SERVICE_DIR = Path(__file__).resolve().parents[2] / "src" / "ml-service"
 sys.path.insert(0, str(SERVICE_DIR))
 
 import app as ml_app  # noqa: E402
