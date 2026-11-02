@@ -506,15 +506,17 @@ app.MapGet("/api/admin/audit/verify", async (SimInventoryDbContext db) =>
 {
     var events = await db.AuditEvents.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
     var previous = "GENESIS";
+    var checkedEvents = 0;
     foreach (var entry in events)
     {
         var expected = AuditHash.ComputeHash(previous, entry.CreatedAt, entry.ActorEmail,
             entry.Action, entry.EntityType, entry.EntityId, entry.Details);
         if (entry.PreviousHash != previous || entry.Hash != expected)
-            return Results.Ok(new { valid = false, checkedEvents = entry.Id - 1, firstInvalidEventId = entry.Id });
+            return Results.Ok(new { valid = false, checkedEvents, firstInvalidEventId = entry.Id });
         previous = entry.Hash;
+        checkedEvents++;
     }
-    return Results.Ok(new { valid = true, checkedEvents = events.Count, firstInvalidEventId = (long?)null });
+    return Results.Ok(new { valid = true, checkedEvents, firstInvalidEventId = (long?)null });
 }).RequireAuthorization("Administrators");
 
 static Task<AppUser?> CurrentUserAsync(ClaimsPrincipal principal, SimInventoryDbContext db)
