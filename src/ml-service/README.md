@@ -1,0 +1,48 @@
+# SIM Cost Anomaly Inference Service
+
+A small Python API for loading the exported Isolation Forest model and scoring cost records.
+
+## Status
+
+Scaffold only. The trained model file is not committed here. Place the exported model at `notebooks/models/sim_cost_isolation_forest.joblib` or set `MODEL_PATH` to its location.
+
+## Run locally
+
+From the repository root:
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\\Scripts\\activate
+# Linux/macOS:
+source .venv/bin/activate
+
+pip install -r src/ml-service/requirements.txt
+uvicorn app:app --app-dir src/ml-service --host 127.0.0.1 --port 8001
+```
+
+Set `MODEL_PATH` if the model is stored elsewhere.
+
+## Endpoint
+
+- `GET /health`: reports whether the model loaded.
+- `POST /predict`: accepts `monthly_cost` and `expected_cost`; calculates `cost_ratio` and returns the Isolation Forest result and decision score.
+
+Example request:
+
+```json
+{
+  "monthly_cost": 1500,
+  "expected_cost": 1400
+}
+```
+
+## Safety and integration notes
+
+- Send only synthetic or explicitly approved data during development.
+- Do not connect this service directly to PostgreSQL.
+- Keep it behind the authenticated ASP.NET API; do not expose it directly to browsers.
+- The current model is synthetic-data-trained and is for demonstration only.
+- A valid, organisation-approved expected-cost baseline is required before scoring organisational records.
+- A model anomaly flag is an investigation signal, not proof of an incorrect charge.
+- This service does not modify SIM status or take operational action.
