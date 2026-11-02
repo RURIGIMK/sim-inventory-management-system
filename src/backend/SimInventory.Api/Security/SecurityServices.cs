@@ -61,19 +61,46 @@ public static class AuditHash
 
 public static class AuditWriter
 {
+    // A transaction-scoped PostgreSQL advisory lock serializes audit appends across
+    // API instances. The lock is held until the event and any pending changes save.
+    private const long AppendLockKey = 73482190651234L;
+
     public static async Task WriteAsync(SimInventory.Api.Data.SimInventoryDbContext db,
         ClaimsPrincipal actor, string action, string entityType, string entityId, string details)
     {
-        var previous = await db.AuditEvents.OrderByDescending(x => x.Id).Select(x => x.Hash).FirstOrDefaultAsync() ?? "GENESIS";
-        var email = actor.FindFirstValue(ClaimTypes.Email) ?? "system";
-        var actorIdValue = actor.FindFirstValue(ClaimTypes.NameIdentifier);
-        Guid? actorId = Guid.TryParse(actorIdValue, out var parsed) ? parsed : null;
-        var created = AuditHash.NormalizeTimestamp(DateTimeOffset.UtcNow);
-        var hash = AuditHash.ComputeHash(previous, created, email, action, entityType, entityId, details);
-        db.AuditEvents.Add(new AuditEvent
+        var ownsTransaction = db.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await db.Database.BeginTransactionAsync()
+            : null;
+
+        try
         {
-            ActorUserId = actorId, ActorEmail = email, Action = action, EntityType = entityType,
-            EntityId = entityId, Details = details, CreatedAt = created, PreviousHash = previous, Hash = hash
-        });
+            await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({AppendLockKey})");
+
+            var previous = await db.AuditEvents.OrderByDescending(x => x.Id)
+                .Select(x => x.Hash).FirstOrDefaultAsync() ?? "GENESIS";
+            var email = actor.FindFirstValue(ClaimTypes.Email) ?? "system";
+            var actorIdValue = actor.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid? actorId = Guid.TryParse(actorIdValue, out var parsed) ? parsed : null;
+            var created = AuditHash.NormalizeTimestamp(DateTimeOffset.UtcNow);
+            var hash = AuditHash.ComputeHash(previous, created, email, action, entityType, entityId, details);
+
+            db.AuditEvents.Add(new AuditEvent
+            {
+                ActorUserId = actorId, ActorEmail = email, Action = action, EntityType = entityType,
+                EntityId = entityId, Details = details, CreatedAt = created, PreviousHash = previous, Hash = hash
+            });
+
+            // Save while holding the advisory lock so the next writer sees this hash.
+            await db.SaveChangesAsync();
+            if (ownsTransaction)
+                await transaction!.CommitAsync();
+        }
+        catch
+        {
+            if (ownsTransaction && transaction is not null)
+                await transaction.RollbackAsync();
+            throw;
+        }
     }
 }
