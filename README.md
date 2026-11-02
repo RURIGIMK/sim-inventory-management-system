@@ -28,6 +28,7 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - Read-only employee directory backed by PostgreSQL, with 30 synthetic employee records and 30 available synthetic SIM records seeded idempotently at API startup. The seed never deletes or overwrites existing records. A real organization must connect an approved HR data feed before using actual employee records.
 - SIM allocation, return and reassignment APIs and interface, preserving assignment history.
 - Hash-linked audit events, timestamp-stable SHA-256 verification and an administrator-only audit verification endpoint.\n- Explainable SIM Asset Intelligence alerts for unusual same-operator costs, contract dates and inventory consistency, with human-review guidance.
+- Authenticated reporting dashboard for inventory status, monthly committed cost, operator and cost-centre breakdowns, contract dates and allocation history, with CSV export.
 - GitHub Actions CI workflow and gated deployment workflow.
 - Render Docker deployment, Cloudflare static-export configuration, Neon setup guide, security guide, technical specification and optional synthetic-data ML plan.
 
@@ -99,6 +100,7 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The deploy workflow is gated by
 - [Technical specification and acceptance criteria](docs/TECHNICAL_SPECIFICATION.md)
 - [Security design and limitations](docs/SECURITY.md)
 - [Deployment and environment setup](docs/DEPLOYMENT.md)
+- [Reporting scope and interpretation](docs/REPORTING.md)
 - [Optional synthetic-data ML experiment](docs/ML_PROTOTYPE.md)
 - [Colab notebook: synthetic cost anomaly experiment](notebooks/sim_cost_anomaly_demo.ipynb)
 - [Testing notes](docs/TESTING.md)
