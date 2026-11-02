@@ -48,3 +48,19 @@ Example request:
 - A valid, organisation-approved expected-cost baseline is required before scoring organisational records.
 - A model anomaly flag is an investigation signal, not proof of an incorrect charge.
 - This service does not modify SIM status or take operational action.
+
+## Automated tests
+
+From the repository root, activate your Python virtual environment and install the test dependencies:
+
+```bash
+pip install -r src/ml-service/requirements-dev.txt
+```
+
+Run the service tests:
+
+```bash
+python -m pytest tests/ml-service -v
+```
+
+The tests cover health reporting, normal and anomalous response handling, request validation, and unavailable-model handling. They use a deterministic stub model so the API behavior is tested independently of the exported model artifact. They do not measure the real model's predictive accuracy.
