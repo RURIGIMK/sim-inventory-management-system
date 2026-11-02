@@ -505,18 +505,64 @@ app.MapPost("/api/allocations/{id:int}/reassign", async (int id, ReassignSimRequ
 app.MapGet("/api/admin/audit/verify", async (SimInventoryDbContext db) =>
 {
     var events = await db.AuditEvents.AsNoTracking().OrderBy(x => x.Id).ToListAsync();
-    var previous = "GENESIS";
-    var checkedEvents = 0;
-    foreach (var entry in events)
+    var valid = AuditChainRecovery.Verify(events, out var evidence, out var checkpointId, out var invalidEventId);
+    var recovered = valid && checkpointId.HasValue;
+    return Results.Ok(new
     {
-        var expected = AuditHash.ComputeHash(previous, entry.CreatedAt, entry.ActorEmail,
-            entry.Action, entry.EntityType, entry.EntityId, entry.Details);
-        if (entry.PreviousHash != previous || entry.Hash != expected)
-            return Results.Ok(new { valid = false, checkedEvents, firstInvalidEventId = entry.Id });
-        previous = entry.Hash;
-        checkedEvents++;
+        valid,
+        status = !valid ? "verification_failed" : recovered ? "recovered_with_historical_fork" : "valid",
+        checkedEvents = valid ? events.Count : events.TakeWhile(x => x.Id != invalidEventId).Count(),
+        firstInvalidEventId = invalidEventId,
+        recoveryEventId = checkpointId,
+        historicalFork = evidence
+    });
+}).RequireAuthorization("Administrators");
+
+app.MapPost("/api/admin/audit/recover", async (ClaimsPrincipal principal, SimInventoryDbContext db) =>
+{
+    await using var transaction = await db.Database.BeginTransactionAsync();
+    try
+    {
+        const long appendLockKey = 73482190651234L;
+        await db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({appendLockKey})");
+        var events = await db.AuditEvents.OrderBy(x => x.Id).ToListAsync();
+
+        if (events.Any(x => x.Action == AuditChainRecovery.CheckpointAction))
+            return Results.Conflict(new { message = "An audit recovery checkpoint already exists. Refresh verification instead." });
+
+        if (!AuditChainRecovery.TryBuildEvidence(events, out var evidence, out var reason))
+            return Results.Conflict(new { message = reason });
+
+        var email = principal.FindFirstValue(ClaimTypes.Email) ?? "system";
+        var actorIdText = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        Guid? actorId = Guid.TryParse(actorIdText, out var parsed) ? parsed : null;
+        var details = System.Text.Json.JsonSerializer.Serialize(evidence);
+        var created = AuditHash.NormalizeTimestamp(DateTimeOffset.UtcNow);
+        var previousHash = events[^1].Hash;
+        var hash = AuditHash.ComputeHash(previousHash, created, email,
+            AuditChainRecovery.CheckpointAction, "audit_chain", "historical-fork", details);
+
+        db.AuditEvents.Add(new AuditEvent
+        {
+            ActorUserId = actorId,
+            ActorEmail = email,
+            Action = AuditChainRecovery.CheckpointAction,
+            EntityType = "audit_chain",
+            EntityId = "historical-fork",
+            Details = details,
+            CreatedAt = created,
+            PreviousHash = previousHash,
+            Hash = hash
+        });
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return Results.Ok(new { message = "Recovery checkpoint recorded. Original audit events were preserved.", recoveryEventId = db.AuditEvents.Local.OrderByDescending(x => x.Id).First().Id, historicalFork = evidence });
     }
-    return Results.Ok(new { valid = true, checkedEvents, firstInvalidEventId = (long?)null });
+    catch
+    {
+        await transaction.RollbackAsync();
+        throw;
+    }
 }).RequireAuthorization("Administrators");
 
 static Task<AppUser?> CurrentUserAsync(ClaimsPrincipal principal, SimInventoryDbContext db)
