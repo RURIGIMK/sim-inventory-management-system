@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-import numpy as np
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -73,9 +73,9 @@ def predict(request: PredictionRequest) -> PredictionResponse:
         )
 
     cost_ratio = request.monthly_cost / request.expected_cost
-    features = np.asarray(
+    features = pd.DataFrame(
         [[request.monthly_cost, request.expected_cost, cost_ratio]],
-        dtype=float,
+        columns=["monthly_cost", "expected_cost", "cost_ratio"],
     )
 
     try:
