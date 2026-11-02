@@ -2,9 +2,11 @@
 
 A small Python API for loading the exported Isolation Forest model and scoring cost records.
 
-## Status
+## Model artifact
 
-Scaffold only. The trained model file is not committed here. Place the exported model at `notebooks/models/sim_cost_isolation_forest.joblib` or set `MODEL_PATH` to its location.
+The exported model is stored at `notebooks/models/sim_cost_isolation_forest.joblib`. The service loads this file by default. Set `MODEL_PATH` to override the location.
+
+The dependency file pins scikit-learn to version `1.6.1`, matching the version recorded in the model metadata.
 
 ## Run locally
 
