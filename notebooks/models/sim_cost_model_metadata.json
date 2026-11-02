@@ -1,0 +1,18 @@
+{
+    "model_name": "SIM Cost Isolation Forest",
+    "model_version": "1.0.0",
+    "model_type": "IsolationForest",
+    "training_data": "600 synthetic SIM cost records",
+    "training_records": 420,
+    "test_records": 180,
+    "features": [
+        "monthly_cost",
+        "expected_cost",
+        "cost_ratio"
+    ],
+    "n_estimators": 250,
+    "contamination": 0.05,
+    "random_state": 42,
+    "scikit_learn_version": "1.6.1",
+    "data_classification": "Synthetic demonstration data only"
+}
