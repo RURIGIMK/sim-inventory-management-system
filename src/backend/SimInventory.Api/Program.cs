@@ -419,11 +419,12 @@ app.MapPost("/api/sims", async (Sim sim, ClaimsPrincipal principal, SimInventory
 
     sim.Id = 0;
     sim.Status = SimStatus.Available;
+    await using var transaction = await db.Database.BeginTransactionAsync();
     db.Sims.Add(sim);
     await db.SaveChangesAsync();
     await AuditWriter.WriteAsync(db, principal, "sim_registered", "sim", sim.Id.ToString(),
         System.Text.Json.JsonSerializer.Serialize(new { sim.Operator, sim.PlanType, sim.CostCentre }));
-    await db.SaveChangesAsync();
+    await transaction.CommitAsync();
     return Results.Created($"/api/sims/{sim.Id}", sim);
 }).RequireAuthorization("Managers");
 
