@@ -49,7 +49,7 @@ def generate_synthetic_data(
     monthly_cost = rng.normal(expected_cost, expected_cost * 0.12)
     monthly_cost = np.maximum(100.0, monthly_cost)
 
-    anomaly_count = max(1, round(n_records * anomaly_rate))
+    anomaly_count = max(2, round(n_records * anomaly_rate))
     anomaly_indices = rng.choice(n_records, size=anomaly_count, replace=False)
     labels = np.zeros(n_records, dtype=int)
     labels[anomaly_indices] = 1
