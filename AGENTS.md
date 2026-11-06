@@ -242,3 +242,13 @@ A first source inspection of the current notebook found the following issues. Tr
 - The existing ML-service tests stub the model; they validate API response behaviour, not that the committed joblib artifact loads and scores correctly.
 
 Next agent should address these in the ML experiment phase. Avoid claiming runtime reproducibility or model quality until a clean full notebook execution and artifact round-trip test have actually passed.
+
+
+## 13. Active handover status (2026-11-06)
+
+- PR #11 (`docs/agent-handover`) contains this expanded handover document. Its CI run completed successfully. It is awaiting user review/merge.
+- PR #12 (`feat/reproducible-ml-evaluation`) implements the first ML pipeline repair workstream described above. It is awaiting its final CI checks and user review/merge.
+- PR #12 adds `notebooks/sim_cost_model.py`, revises the Colab notebook to call that shared pipeline, exports model metadata with the trained artifact, adds pipeline tests, and makes the inference API report metadata-backed model version/classification.
+- Do not duplicate the work in PR #12 while it remains open. Its CI tests do not prove predictive performance and do not replace a fresh, full Colab runtime execution.
+- After PR #12 is merged, run the updated notebook in a fresh Colab runtime using synthetic data, inspect the generated evaluation and model metadata, verify the model artifact can be loaded by the inference service, and record the actual observed results. Do not commit refreshed binary artifacts or publish metrics until this review is complete.
+- The next major decision after that validation is whether the model adds sufficient value beyond the deterministic rules and baseline to justify integration. Do not begin production ML integration by default.
