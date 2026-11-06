@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
@@ -64,7 +65,7 @@ export default function ReportsPage() {
 
   return <main className="admin-shell">
     <header className="admin-header">
-      <div><a href="/" className="back-link">← Inventory</a><p className="auth-eyebrow">MANAGEMENT REPORTING</p><h1>SIM reports</h1><p>Current inventory position, allocation history and monthly cost distribution.</p></div>
+      <div><Link href="/" className="back-link">← Inventory</Link><p className="auth-eyebrow">MANAGEMENT REPORTING</p><h1>SIM reports</h1><p>Current inventory position, allocation history and monthly cost distribution.</p></div>
       <div className="report-actions"><button className="text-button" onClick={() => void load()}>Refresh data</button><button className="primary-button" disabled={!report} onClick={() => report && downloadCsv(report)}>Export CSV</button></div>
     </header>
     <div className="intelligence-note"><strong>Reporting basis</strong><p>Figures are calculated from the current application database when this page loads. Monthly committed cost excludes deactivated SIMs. Allocation history includes the latest 100 records. Amounts are recorded monthly costs, not verified operator invoices.</p></div>
