@@ -3,8 +3,8 @@
 Last verified: 2026-11-06
 Repository: `RURIGIMK/sim-inventory-management-system`
 Default branch: `main`
-Verified main commit after PR #10: `c314268fdac5b2eef0638c6aeaa834fc536b07b6`
-Latest completed change: PR #10, "Improve application loading and audit recovery" (merged; user confirmed successful checks).
+Verified main commit after PR #12: `021f85bdc5253e931968ae0ee44433f55da50bc3`
+Latest completed changes: PR #11 (agent handover) and PR #12 (reproducible ML training/evaluation) are merged; main CI and Deploy workflows passed.
 
 Read this file before changing code. It is the continuity source for future developers and AI agents. Keep it current when implementation status, decisions or next steps change. Verify repository state rather than trusting an old chat summary.
 
@@ -231,24 +231,62 @@ Before a PR:
 - `docs/AI_ASSISTANCE.md`: AI-assisted development disclosure.
 
 
-## 12. ML notebook audit findings (2026-11-06)
+## 12. ML pipeline implementation status (2026-11-06)
 
-A first source inspection of the current notebook found the following issues. Treat these as confirmed from the committed notebook source, not as runtime test results:
+PR #12 (`feat/reproducible-ml-evaluation`) is merged into `main` as commit `021f85bdc5253e931968ae0ee44433f55da50bc3`. The user confirmed both PR #11 and PR #12 were merged and all checks passed. GitHub Actions CI and Deploy workflows for this main commit both completed successfully.
 
-- The synthetic generator hardcodes `N_RECORDS = 600` and `N_ANOMALIES = 30`; there is no configurable dataset loader or validation path for an alternate input dataset.
-- The notebook's final cell exports the evaluation CSV only. It does not serialize the fitted Isolation Forest, despite a separate joblib artifact already being present in the repository. The artifact's provenance and correspondence to the current notebook therefore need to be established.
-- The synthetic anomaly injection uses cost ratios above 2.5 or below 0.25, while the transparent baseline flags ratios above 1.8 or below 0.35. This makes the baseline threshold almost perfectly aligned with the synthetic label-generation rule and makes the comparison weak evidence of general anomaly-detection value.
-- The notebook currently does not export a complete, versioned bundle tying together model artifact, feature schema, preprocessing, training configuration, dataset fingerprint, evaluation metrics and run timestamp.
-- The existing ML-service tests stub the model; they validate API response behaviour, not that the committed joblib artifact loads and scores correctly.
+The merged implementation:
+- Adds `notebooks/sim_cost_model.py` as the shared, versioned training entry point.
+- Uses deterministic synthetic data by default; supports an optional approved, de-identified CSV with required numeric `monthly_cost` and `expected_cost` fields.
+- Uses a stratified held-out test set for labelled data and reports precision, recall, F1, confusion counts and false-positive rate for Isolation Forest and a cost-ratio baseline.
+- Suppresses classification metrics for unlabelled data.
+- Saves the Isolation Forest artifact and adjacent JSON metadata, including model version, feature order, configuration, data classification, record counts, dataset fingerprint and evaluation metrics.
+- Exports a held-out evaluation CSV and run summary.
+- Updates the separate FastAPI prototype to read model version and data classification from adjacent metadata and validate feature schema.
+- Adds training-pipeline tests for reproducibility, serialization, metadata and invalid inputs.
 
-Next agent should address these in the ML experiment phase. Avoid claiming runtime reproducibility or model quality until a clean full notebook execution and artifact round-trip test have actually passed.
+Do not interpret merged CI as proof of predictive accuracy. It establishes automated build/test success only. The model is still experimental, synthetic-first, not deployed and not integrated into .NET or Reports.
 
+## 13. Immediate next action: fresh Colab validation
 
-## 13. Active handover status (2026-11-06)
+Notebook: `notebooks/sim_cost_anomaly_demo.ipynb`
+Training script: `notebooks/sim_cost_model.py`
+Documentation: `docs/ML_PROTOTYPE.md`
 
-- PR #11 (`docs/agent-handover`) contains this expanded handover document. Its CI run completed successfully. It is awaiting user review/merge.
-- PR #12 (`feat/reproducible-ml-evaluation`) implements the first ML pipeline repair workstream described above. It is awaiting its final CI checks and user review/merge.
-- PR #12 adds `notebooks/sim_cost_model.py`, revises the Colab notebook to call that shared pipeline, exports model metadata with the trained artifact, adds pipeline tests, and makes the inference API report metadata-backed model version/classification.
-- Do not duplicate the work in PR #12 while it remains open. Its CI tests do not prove predictive performance and do not replace a fresh, full Colab runtime execution.
-- After PR #12 is merged, run the updated notebook in a fresh Colab runtime using synthetic data, inspect the generated evaluation and model metadata, verify the model artifact can be loaded by the inference service, and record the actual observed results. Do not commit refreshed binary artifacts or publish metrics until this review is complete.
-- The next major decision after that validation is whether the model adds sufficient value beyond the deterministic rules and baseline to justify integration. Do not begin production ML integration by default.
+The next agent must guide the user through a fresh Google Colab runtime, using synthetic data only:
+1. Open the notebook from the `main` branch and choose Runtime > Disconnect and delete runtime, then reconnect.
+2. Run every cell from top to bottom. The notebook installs `src/ml-service/requirements-dev.txt`, clones the current repository, trains the model and saves outputs.
+3. Inspect metadata and evaluation CSV. Confirm dataset count, 420/180 split for default 600 rows, model version, feature list, dataset fingerprint and non-null labelled evaluation metrics.
+4. Review both confusion matrices and precision, recall, F1 and false-positive rate. Compare Isolation Forest against the baseline. Do not assume Isolation Forest must win; interpret results and class balance.
+5. Run the notebook's inference verification cell. It imports the FastAPI app against the newly generated artifact, checks model deserialization, schema and metadata, then calls the prediction function locally.
+6. Run the ML pytest suite from the notebook. It must complete successfully.
+7. Download and retain the four generated outputs: `sim_cost_isolation_forest.joblib`, `sim_cost_model_metadata.json`, `sim_anomaly_evaluation.csv` and `run_summary.json`.
+8. Ask the user to share the notebook output or the four downloaded artifacts for review. Do not ask for organizational data.
+9. Record only metrics actually observed. Do not commit model binaries or publish performance claims before reviewing results.
+
+The Colab notebook now includes dependency installation, local inference-artifact verification and ML pytest execution. These are source-level additions; a fresh Google Colab run has not yet been observed.
+
+### Expected default configuration
+
+- 600 synthetic records, anomaly rate 0.05, seed 42.
+- Stratified 70/30 train/test split: 420 training records and 180 held-out test records.
+- Isolation Forest: 250 estimators, contamination 0.05, random_state 42.
+- Model version 1.1.0.
+- Features: `monthly_cost`, `expected_cost`, `cost_ratio`.
+- Baseline flags cost ratios above 1.8 or below 0.35.
+- Output model and metadata under `notebooks/models/`; evaluation CSV and run summary under `notebooks/results/`.
+
+### After Colab validation
+
+Only after inspecting real run results, decide whether the model provides enough value beyond the deterministic baseline to justify further work. Do not start production ML integration by default. The current .NET Intelligence page still uses deterministic rules; the Reports page still contains operational aggregates and CSV export, not ML evaluation metrics. The SIM schema does not have a verified expected-cost field or invoice history.
+
+If integration is justified, design a separately approved phase with server-to-server .NET-to-FastAPI calls, authentication, timeouts, safe unavailable-service behaviour, human review, versioning, rollback and monitoring. Never connect the ML service directly to PostgreSQL or expose it to browsers.
+
+## 14. Active handover status (2026-11-06)
+
+- PR #11 and PR #12 are merged.
+- Latest verified main commit: `021f85bdc5253e931968ae0ee44433f55da50bc3`.
+- CI and Deploy workflows for that commit passed.
+- Current open work is fresh Colab validation, not another implementation PR.
+- A small follow-up PR is being prepared to update this handover and add explicit Colab runtime checks (dependency installation, actual artifact load/inference and ML tests). Verify its merge status before relying on those notebook additions.
+- Never repeat merged ML pipeline implementation. Read this file and inspect `main` before proceeding.
