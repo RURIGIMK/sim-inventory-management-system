@@ -1,16 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root{--accent:#EC1C24;--accent-dark:#c9151c;--ink:#17191d;--muted:#70757f;--line:#e6e7ea;--canvas:#f6f7f8;--surface:#fff;--green:#16794b;--green-bg:#eaf6ef;--amber:#936200;--amber-bg:#fff5dc;--red:#b4232c;--red-bg:#ffedef}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--canvas);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit}
 button{cursor:pointer}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(236,28,36,.22);outline-offset:2px}
 .app-shell{min-height:100vh;display:flex}
 .sidebar{width:236px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;padding:26px 16px 18px}
 .brand-lockup{display:flex;align-items:center;gap:11px;padding:0 8px 36px}
-.brand-mark{width:35px;height:35px;display:grid;place-items:center;background:var(--accent);color:#fff;border-radius:8px;font-family:Manrope,sans-serif;font-weight:800;font-size:20px}
+.brand-mark{width:35px;height:35px;display:grid;place-items:center;background:var(--accent);color:#fff;border-radius:8px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:800;font-size:20px}
 .brand-lockup strong{display:block;font-family:Manrope,sans-serif;font-size:14px;letter-spacing:-.3px}
 .brand-lockup small{display:block;color:#898d95;font-size:9px;letter-spacing:1.6px;font-weight:700;margin-top:3px}
 .workspace-label{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#9a9da5;padding:0 11px 11px}
@@ -177,3 +176,10 @@ tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#fdfdfd}
 .report-status strong{display:block;font-family:Manrope,sans-serif;font-size:22px;margin-top:6px}
 .report-table{min-width:700px}
 @media(max-width:760px){.report-actions{align-items:stretch;flex-direction:column}.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.report-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Keep audit actions clearly separated and prevent accidental double submissions. */
+.audit-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.recovery-button{border-color:#d7a35a;color:#805000;background:#fffaf0}
+.recovery-button:hover{background:#fff3dc}
+.audit-actions button:disabled{opacity:.55;cursor:wait}
+@media(max-width:760px){.audit-actions{width:100%;justify-content:flex-start}}
