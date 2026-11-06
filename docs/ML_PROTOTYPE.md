@@ -4,7 +4,7 @@ The ML work is an experimental decision-support component. It is not required fo
 
 ## Reproducible training workflow
 
-The training logic is maintained in `notebooks/sim_cost_model.py`. The Colab notebook `notebooks/sim_cost_anomaly_demo.ipynb` clones the repository and runs that same script, so local and Colab execution share one implementation.
+The training logic is maintained in `notebooks/sim_cost_model.py`. The Colab notebook `notebooks/sim_cost_anomaly_demo.ipynb` clones the repository and runs that same script, so local and Colab execution share one implementation. It installs the ML development requirements, verifies the newly exported artifact by loading it through the FastAPI inference module and making a local prediction, and runs the ML pytest suite.
 
 Run from the repository root:
 
@@ -48,6 +48,8 @@ The pipeline uses a fixed random seed for repeatable synthetic generation and a 
 Synthetic anomaly multipliers intentionally overlap part of the normal range, so the reference rule is not guaranteed to recover every injected label. This is still a controlled demonstration, not a substitute for representative, independently labelled billing data. Review the confusion matrix, precision, recall, F1 and false-positive rate rather than relying on a single accuracy figure.
 
 For unlabelled datasets, the model can produce anomaly scores and flags, but no classification-performance claim is valid. A flag is an investigation prompt, not proof of overbilling or misconduct.
+
+A successful GitHub Actions run verifies automated checks only. Complete the notebook from first to last cell in a fresh Colab runtime and inspect the actual metrics and inference output before claiming the experiment is reproducible end-to-end.
 
 ## Current application boundary
 
