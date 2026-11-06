@@ -175,7 +175,7 @@ if (initializeDatabase)
         // Seed a repeatable synthetic directory and available SIM pool for demonstrations.
         // Existing records and allocations are preserved.
         await DemoDataSeeder.SeedAsync(db);
-    
+    }
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "sim-inventory-api" }));
