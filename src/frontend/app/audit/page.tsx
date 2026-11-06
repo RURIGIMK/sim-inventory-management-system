@@ -21,14 +21,17 @@ export default function AuditPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await request("/api/admin/audit");
+      const [response, check] = await Promise.all([
+        request("/api/admin/audit"),
+        request("/api/admin/audit/verify")
+      ]);
       if (!response.ok) throw new Error(response.status === 403 ? "Administrator access is required to view the audit trail." : "Could not load audit events.");
-      setEvents(await response.json() as AuditEvent[]);
-      const check = await request("/api/admin/audit/verify");
       if (!check.ok) throw new Error(check.status === 403
         ? "Administrator access is required to verify the audit trail."
         : "Audit records loaded, but chain verification could not be completed.");
-      setVerification(await check.json() as Verification);
+      const [auditData, verificationData] = await Promise.all([response.json(), check.json()]);
+      setEvents(auditData as AuditEvent[]);
+      setVerification(verificationData as Verification);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load audit trail."); }
     finally { setLoading(false); }
   }, [request]);
