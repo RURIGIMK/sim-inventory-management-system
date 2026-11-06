@@ -96,9 +96,10 @@ def load_dataset(input_csv: Path | None, args: argparse.Namespace) -> tuple[pd.D
         raise ValueError("At least 20 valid records are required.")
 
     if LABEL_COLUMN in frame.columns:
-        frame[LABEL_COLUMN] = pd.to_numeric(frame[LABEL_COLUMN], errors="raise").astype(int)
-        if not frame[LABEL_COLUMN].isin([0, 1]).all():
+        labels = pd.to_numeric(frame[LABEL_COLUMN], errors="raise")
+        if not labels.isin([0, 1]).all():
             raise ValueError(f"{LABEL_COLUMN} must contain only 0 and 1.")
+        frame[LABEL_COLUMN] = labels.astype(int)
 
     frame["cost_ratio"] = frame["monthly_cost"] / frame["expected_cost"]
     return frame, "approved_csv"
