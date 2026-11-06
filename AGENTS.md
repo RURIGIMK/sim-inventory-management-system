@@ -3,8 +3,8 @@
 Last verified: 2026-11-06
 Repository: `RURIGIMK/sim-inventory-management-system`
 Default branch: `main`
-Verified main commit after PR #12: `021f85bdc5253e931968ae0ee44433f55da50bc3`
-Latest completed changes: PR #11 (agent handover) and PR #12 (reproducible ML training/evaluation) are merged; main CI and Deploy workflows passed.
+Verified main commit after PR #13: `2a48ee7fd6f13b1368b97638931042de275ff0df`
+Latest completed changes: PR #11 (agent handover), PR #12 (reproducible ML training/evaluation) and PR #13 (fresh Colab validation preparation) are merged.
 
 Read this file before changing code. It is the continuity source for future developers and AI agents. Keep it current when implementation status, decisions or next steps change. Verify repository state rather than trusting an old chat summary.
 
@@ -105,7 +105,7 @@ Do not repeat this work without evidence of regression. Render Free cold starts 
 - Notebook: `notebooks/sim_cost_anomaly_demo.ipynb`.
 - Generates synthetic SIM cost records.
 - Existing metadata says 600 synthetic records, 420 training and 180 test records.
-- Isolation Forest v1.0.0; 250 estimators; contamination 0.05; random_state 42; scikit-learn 1.6.1.
+- Isolation Forest v1.1.0; 250 estimators; contamination 0.05; random_state 42; scikit-learn 1.6.1.
 - Features: `monthly_cost`, `expected_cost`, `cost_ratio`.
 - Evaluation CSV: `notebooks/results/sim_anomaly_evaluation.csv`.
 - Artifact: `notebooks/models/sim_cost_isolation_forest.joblib`.
@@ -260,7 +260,7 @@ The next agent must guide the user through a fresh Google Colab runtime, using s
 4. Review both confusion matrices and precision, recall, F1 and false-positive rate. Compare Isolation Forest against the baseline. Do not assume Isolation Forest must win; interpret results and class balance.
 5. Run the notebook's inference verification cell. It imports the FastAPI app against the newly generated artifact, checks model deserialization, schema and metadata, then calls the prediction function locally.
 6. Run the ML pytest suite from the notebook. It must complete successfully.
-7. Download and retain the four generated outputs: `sim_cost_isolation_forest.joblib`, `sim_cost_model_metadata.json`, `sim_anomaly_evaluation.csv` and `run_summary.json`.
+7. Download the single `sim_cost_anomaly_outputs.zip` bundle. It contains the four generated outputs (`sim_cost_isolation_forest.joblib`, `sim_cost_model_metadata.json`, `sim_anomaly_evaluation.csv`, `run_summary.json`) plus `artifact_manifest.json` with file sizes and SHA-256 hashes.
 8. Ask the user to share the notebook output or the four downloaded artifacts for review. Do not ask for organizational data.
 9. Record only metrics actually observed. Do not commit model binaries or publish performance claims before reviewing results.
 
@@ -284,9 +284,8 @@ If integration is justified, design a separately approved phase with server-to-s
 
 ## 14. Active handover status (2026-11-06)
 
-- PR #11 and PR #12 are merged.
-- Latest verified main commit: `021f85bdc5253e931968ae0ee44433f55da50bc3`.
-- CI and Deploy workflows for that commit passed.
-- Current open work is fresh Colab validation, not another implementation PR.
-- A small follow-up PR is being prepared to update this handover and add explicit Colab runtime checks (dependency installation, actual artifact load/inference and ML tests). Verify its merge status before relying on those notebook additions.
+- PRs #11, #12 and #13 are merged. PR #13 merge commit: `2a48ee7fd6f13b1368b97638931042de275ff0df`.
+- PR #13 added pinned dependency installation, local artifact load/inference verification and ML pytest execution to the Colab notebook.
+- The notebook now downloads one ZIP bundle containing the model, metadata, evaluation CSV, run summary and a SHA-256 manifest.
+- Fresh-runtime Colab execution is still the outstanding user-side validation. No one needs to recreate the training pipeline or edit repository code for this step.
 - Never repeat merged ML pipeline implementation. Read this file and inspect `main` before proceeding.
