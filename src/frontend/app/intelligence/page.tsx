@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
@@ -70,7 +71,7 @@ export default function IntelligencePage() {
   return <main className="admin-shell">
     <header className="admin-header">
       <div>
-        <a href="/" className="back-link">← Inventory</a>
+        <Link href="/" className="back-link">← Inventory</Link>
         <p className="auth-eyebrow">ASSET INTELLIGENCE</p>
         <h1>SIM asset intelligence</h1>
         <p>Explainable review flags for cost outliers, contract dates and inventory consistency.</p>
