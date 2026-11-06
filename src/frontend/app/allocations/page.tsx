@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
@@ -57,7 +58,7 @@ export default function AllocationsPage() {
   const available = sims.filter(s => s.status === "Available");
   const activeEmployees = employees.filter(e => e.status === "Active");
   return <main className="admin-shell">
-    <header className="admin-header"><div><a href="/" className="back-link">← Inventory</a><p className="auth-eyebrow">ASSET CUSTODY</p><h1>SIM allocations</h1><p>Allocate, return and reassign SIMs while retaining each assignment record.</p></div><button className="text-button" onClick={() => { sessionStorage.removeItem("simAccessToken"); window.location.href = "/login"; }}>Sign out</button></header>
+    <header className="admin-header"><div><Link href="/" className="back-link">← Inventory</Link><p className="auth-eyebrow">ASSET CUSTODY</p><h1>SIM allocations</h1><p>Allocate, return and reassign SIMs while retaining each assignment record.</p></div><button className="text-button" onClick={() => { sessionStorage.removeItem("simAccessToken"); window.location.href = "/login"; }}>Sign out</button></header>
     {notice && <p className="admin-notice">{notice}</p>}{error && <p className="auth-error">{error}</p>}
     <section className="admin-panel"><h2>New allocation</h2><form className="admin-create-form allocation-form" onSubmit={allocate}>
       <label>Available SIM<select value={simId} onChange={e => setSimId(e.target.value)} required><option value="">Select a SIM</option>{available.map(s => <option key={s.id} value={s.id}>{s.phoneNumber} · {s.iccid}</option>)}</select></label>
