@@ -1,25 +1,63 @@
-# Optional SIM Asset Intelligence Prototype
+# SIM Asset Intelligence ML Experiment
 
-Runnable example: [notebooks/sim_cost_anomaly_demo.ipynb](../notebooks/sim_cost_anomaly_demo.ipynb). Open it in Google Colab and run each cell. It generates synthetic costs locally and exports a review CSV.
+The ML work is an experimental decision-support component. It is not required for core inventory operations and is not currently integrated with the live application database or operational Reports page.
 
-Machine learning is a separate proof of concept, not required for the core inventory system. Do not use real employee or operator data in Colab unless explicit authorization and an approved data-handling plan exist.
+## Reproducible training workflow
 
-## Proposed experiments
+The training logic is maintained in `notebooks/sim_cost_model.py`. The Colab notebook `notebooks/sim_cost_anomaly_demo.ipynb` clones the repository and runs that same script, so local and Colab execution share one implementation.
 
-1. **Cost anomaly flags:** use synthetic monthly costs grouped by plan type, operator and cost centre. Compare robust statistical thresholds with Isolation Forest.
-2. **Contract/asset review queue:** use deterministic rules to flag expired contracts, missing ownership and unusually long unassigned periods. This may be more explainable than ML.
-3. **Idle SIM candidates:** only investigate if an authorized, lawful source of usage data is made available. Inventory status alone cannot prove that a SIM is unused.
-4. **Cost forecasting:** only after sufficient time-series data exists; compare a simple seasonal-naive baseline before trying more complex models.
+Run from the repository root:
 
-## Colab workflow
+```bash
+python -m pip install -r src/ml-service/requirements.txt
+python notebooks/sim_cost_model.py
+```
 
-- Generate synthetic data with documented distributions and a fixed random seed.
-- Split data by time or held-out records to avoid leakage.
-- Compare every model with a transparent baseline.
-- Record precision, recall, false-positive rate and operational usefulness.
-- Export model code, feature definitions and a small synthetic test fixture. Never export credentials or personal data in a notebook.
-- Treat predictions as review suggestions only. A human must verify each flag. Do not automatically suspend a SIM, penalize an employee or change a role based on a model score.
+Optional parameters:
 
-## Integration decision
+```bash
+python notebooks/sim_cost_model.py \
+  --records 800 \
+  --anomaly-rate 0.06 \
+  --seed 42 \
+  --test-size 0.30 \
+  --n-estimators 250 \
+  --contamination 0.05 \
+  --model-dir notebooks/models \
+  --results-dir notebooks/results
+```
 
-Do not add a model-serving service until a baseline experiment demonstrates measurable value. If justified, run scoring as a scheduled Python job or isolated service that reads minimized, authorized data and writes explainable recommendations. The .NET API remains the system of record.
+By default, the pipeline generates synthetic records. It supports an optional CSV with required numeric columns `monthly_cost` and `expected_cost`. An optional `known_synthetic_anomaly` column (0 = normal, 1 = anomaly) enables held-out labelled evaluation. An unlabelled CSV can be scored, but the pipeline intentionally does not report precision, recall, F1 or false-positive rate without ground-truth labels.
+
+Only upload approved, de-identified data. The CSV must not contain employee names, phone numbers, ICCIDs, invoices, credentials or unrelated personal information. The expected-cost field must be a justified baseline, not an assumed invoice amount.
+
+## Outputs and traceability
+
+The training script writes:
+- `notebooks/models/sim_cost_isolation_forest.joblib`: fitted Isolation Forest artifact.
+- `notebooks/models/sim_cost_model_metadata.json`: model version, feature order, configuration, data classification, training/test counts, dataset fingerprint, library version and evaluation metrics when labels exist.
+- `notebooks/results/sim_anomaly_evaluation.csv`: held-out records, predictions, anomaly scores and baseline comparison when labels exist.
+- `notebooks/results/run_summary.json`: run output locations and metadata.
+
+Keep the model artifact and metadata together. The FastAPI service reads the model version and data classification from the adjacent metadata file. Do not replace a deployed model artifact without reviewing its metadata and evaluation.
+
+## Evaluation methodology and limitations
+
+The pipeline uses a fixed random seed for repeatable synthetic generation and a stratified train/test split when labels exist. Isolation Forest is fitted on training features only. It is compared with a transparent cost-ratio rule (ratio above 1.8 or below 0.35).
+
+Synthetic anomaly multipliers intentionally overlap part of the normal range, so the reference rule is not guaranteed to recover every injected label. This is still a controlled demonstration, not a substitute for representative, independently labelled billing data. Review the confusion matrix, precision, recall, F1 and false-positive rate rather than relying on a single accuracy figure.
+
+For unlabelled datasets, the model can produce anomaly scores and flags, but no classification-performance claim is valid. A flag is an investigation prompt, not proof of overbilling or misconduct.
+
+## Current application boundary
+
+- The application Intelligence page uses deterministic, explainable rules in the .NET API. It does not use Isolation Forest.
+- The FastAPI inference prototype in `src/ml-service` is separate and is not deployed or called by the .NET API.
+- The Reports page shows current operational aggregates and CSV export. It does not currently show ML predictions or model evaluation metrics.
+- The SIM schema does not include invoice history, usage time series or a verified expected-cost field.
+
+Do not connect the service to PostgreSQL or expose it directly to browsers. If later justified by evaluation, .NET should call it server-to-server with authentication, timeouts and safe unavailable-service behaviour. ML output must remain human-reviewed decision support.
+
+## Before organizational use
+
+Obtain written authorization, minimize exported fields, remove direct identifiers, define an approved expected-cost baseline and obtain meaningful review labels. Evaluate false positives and missed anomalies with domain reviewers. Establish model versioning, monitoring, rollback and retention controls. Never automatically suspend SIMs or take employee/account action from a prediction.
