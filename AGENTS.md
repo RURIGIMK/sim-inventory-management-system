@@ -229,3 +229,16 @@ Before a PR:
 - `docs/ML_PROTOTYPE.md`: Colab experiment and ML integration constraints.
 - `docs/TESTING.md`: automated checks and manual acceptance matrix.
 - `docs/AI_ASSISTANCE.md`: AI-assisted development disclosure.
+
+
+## 12. ML notebook audit findings (2026-11-06)
+
+A first source inspection of the current notebook found the following issues. Treat these as confirmed from the committed notebook source, not as runtime test results:
+
+- The synthetic generator hardcodes `N_RECORDS = 600` and `N_ANOMALIES = 30`; there is no configurable dataset loader or validation path for an alternate input dataset.
+- The notebook's final cell exports the evaluation CSV only. It does not serialize the fitted Isolation Forest, despite a separate joblib artifact already being present in the repository. The artifact's provenance and correspondence to the current notebook therefore need to be established.
+- The synthetic anomaly injection uses cost ratios above 2.5 or below 0.25, while the transparent baseline flags ratios above 1.8 or below 0.35. This makes the baseline threshold almost perfectly aligned with the synthetic label-generation rule and makes the comparison weak evidence of general anomaly-detection value.
+- The notebook currently does not export a complete, versioned bundle tying together model artifact, feature schema, preprocessing, training configuration, dataset fingerprint, evaluation metrics and run timestamp.
+- The existing ML-service tests stub the model; they validate API response behaviour, not that the committed joblib artifact loads and scores correctly.
+
+Next agent should address these in the ML experiment phase. Avoid claiming runtime reproducibility or model quality until a clean full notebook execution and artifact round-trip test have actually passed.
