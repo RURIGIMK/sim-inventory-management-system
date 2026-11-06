@@ -49,6 +49,8 @@ try:
     else:
         model_load_error = f"Model file not found: {MODEL_PATH}"
 except Exception as exc:  # Keep service startup available for health diagnostics.
+    model = None
+    model_metadata = {}
     model_load_error = str(exc)
 
 
