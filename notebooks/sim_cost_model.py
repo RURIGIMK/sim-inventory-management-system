@@ -121,14 +121,18 @@ def metric_summary(y_true: pd.Series, predictions: np.ndarray) -> dict:
 
 
 def run_experiment(args: argparse.Namespace) -> dict:
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = Path(args.model_dir)
+    results_dir = Path(args.results_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
     frame, source = load_dataset(Path(args.input_csv) if args.input_csv else None, args)
 
     features = frame[FEATURES].astype(float)
     has_labels = LABEL_COLUMN in frame.columns
     if has_labels:
         labels = frame[LABEL_COLUMN].astype(int)
+        if labels.value_counts().min() < 2:
+            raise ValueError("At least two records per class are required for a stratified evaluation split.")
         if labels.nunique() < 2:
             raise ValueError("Evaluation requires both normal (0) and anomaly (1) labels.")
         train_idx, test_idx = train_test_split(
@@ -167,7 +171,6 @@ def run_experiment(args: argparse.Namespace) -> dict:
         ratios = evaluation["cost_ratio"]
         baseline_predictions = ((ratios > 1.8) | (ratios < 0.35)).astype(int).to_numpy()
         evaluation["baseline_flag"] = baseline_predictions
-        evaluation["baseline_metrics"] = ""
         evaluation["isolation_forest_result"] = np.select(
             [
                 (y_test.to_numpy() == 0) & (predictions == 1),
@@ -189,10 +192,10 @@ def run_experiment(args: argparse.Namespace) -> dict:
             "isolation_forest": metric_summary(y_test, predictions),
         }
 
-    evaluation_path = output_dir / "sim_anomaly_evaluation.csv"
+    evaluation_path = results_dir / "sim_anomaly_evaluation.csv"
     evaluation.to_csv(evaluation_path, index=False)
 
-    model_path = output_dir / "sim_cost_isolation_forest.joblib"
+    model_path = model_dir / "sim_cost_isolation_forest.joblib"
     joblib.dump(model, model_path)
 
     dataset_bytes = frame.to_csv(index=False).encode("utf-8")
@@ -223,7 +226,7 @@ def run_experiment(args: argparse.Namespace) -> dict:
             "Anomaly flags require human review and must not trigger automatic operational action.",
         ],
     }
-    metadata_path = output_dir / "sim_cost_model_metadata.json"
+    metadata_path = model_dir / "sim_cost_model_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
     summary = {
@@ -232,7 +235,7 @@ def run_experiment(args: argparse.Namespace) -> dict:
         "evaluation_path": str(evaluation_path),
         "metadata": metadata,
     }
-    (output_dir / "run_summary.json").write_text(
+    (results_dir / "run_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )
     return summary
@@ -241,7 +244,8 @@ def run_experiment(args: argparse.Namespace) -> dict:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-csv", default=None, help="Optional approved, de-identified CSV.")
-    parser.add_argument("--output-dir", default="artifacts", help="Directory for model and reports.")
+    parser.add_argument("--model-dir", default="notebooks/models", help="Directory for the model and metadata.")
+    parser.add_argument("--results-dir", default="notebooks/results", help="Directory for evaluation outputs.")
     parser.add_argument("--records", type=int, default=600, help="Synthetic record count.")
     parser.add_argument("--anomaly-rate", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42)
