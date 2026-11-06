@@ -31,6 +31,31 @@ public class AuditChainRecoveryTests
     }
 
     [Fact]
+    public void RecoveryCheckpointCanFollowNewEventsAddedAfterTheHistoricalFork()
+    {
+        var events = CreateForkedHistory();
+        var previous = events[^1].Hash;
+        for (var id = 15; id <= 16; id++)
+        {
+            var item = CreateEvent(id, previous, "admin@example.test",
+                "login_successful", "user", "admin", "{}");
+            events.Add(item);
+            previous = item.Hash;
+        }
+
+        Assert.True(AuditChainRecovery.TryBuildEvidence(events, out var evidence, out _));
+        Assert.Equal(16, evidence!.SelectedBranchHeadEventId);
+        var details = JsonSerializer.Serialize(evidence);
+        var checkpoint = CreateEvent(17, previous, "admin@example.test",
+            AuditChainRecovery.CheckpointAction, "audit_chain", "historical-fork", details);
+
+        Assert.True(AuditChainRecovery.Verify(events.Append(checkpoint).ToList(),
+            out _, out var checkpointId, out var invalidEventId));
+        Assert.Equal(17, checkpointId);
+        Assert.Null(invalidEventId);
+    }
+
+    [Fact]
     public void RejectsChangesToEventsAfterRecoveryCheckpoint()
     {
         var events = CreateForkedHistory();

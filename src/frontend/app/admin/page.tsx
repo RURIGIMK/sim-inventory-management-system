@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
@@ -67,7 +68,7 @@ export default function AdminUsersPage() {
 
   return <main className="admin-shell">
     <header className="admin-header">
-      <div><a href="/" className="back-link">← Inventory</a><p className="auth-eyebrow">ACCESS CONTROL</p><h1>User administration</h1><p>Create approved accounts and change access without editing application code.</p></div>
+      <div><Link href="/" className="back-link">← Inventory</Link><p className="auth-eyebrow">ACCESS CONTROL</p><h1>User administration</h1><p>Create approved accounts and change access without editing application code.</p></div>
       <button className="text-button" onClick={() => { sessionStorage.removeItem("simAccessToken"); window.location.href = "/login"; }}>Sign out</button>
     </header>
     {notice && <p className="admin-notice" role="status">{notice}</p>}

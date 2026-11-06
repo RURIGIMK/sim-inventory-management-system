@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
@@ -51,7 +52,7 @@ export default function EmployeesPage() {
   return <main className="admin-shell">
     <header className="admin-header">
       <div>
-        <a href="/" className="back-link">← Inventory</a>
+        <Link href="/" className="back-link">← Inventory</Link>
         <p className="auth-eyebrow">PEOPLE DIRECTORY</p>
         <h1>Employees</h1>
         <p>Read-only directory used to select employees for SIM allocation.</p>
