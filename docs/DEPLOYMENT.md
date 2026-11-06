@@ -12,6 +12,17 @@ This is an academic prototype. Use synthetic records only until an organization 
 
 This is a zero-cash-cost target, not a production availability guarantee. Render Free services sleep after 15 minutes without traffic and may take about a minute to wake. Free quotas and policies can change. Do not use free hosting for sensitive real employee data or production workloads.
 
+## Database initialization and startup performance
+
+The deployed database is already provisioned. Production API startup therefore skips schema creation and synthetic demo seeding by default, avoiding repeated database round trips during Render cold starts.
+
+- Production: leave `Database__InitializeOnStartup` unset or set it to `false`.
+- Local development: initialization defaults to enabled when `ASPNETCORE_ENVIRONMENT=Development`.
+- New empty database: initialize it deliberately in a controlled setup step before deploying with initialization disabled. Do not enable startup initialization against a database containing real organizational data.
+- The current prototype still uses `EnsureCreatedAsync` and idempotent SQL bootstrap statements for local setup. Reviewed EF Core migrations are required before production or real-data use.
+
+Render Free services can sleep after inactivity and take time to wake. Removing repeated schema checks and demo seeding reduces application startup work, but it cannot eliminate the hosting platform's cold-start delay. A consistently warm service requires an instance plan that does not sleep.
+
 ## Neon PostgreSQL
 
 1. Use the `sim_inventory` database on the Neon project.
