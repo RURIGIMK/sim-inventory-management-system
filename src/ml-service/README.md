@@ -4,9 +4,20 @@ A small Python API for loading the exported Isolation Forest model and scoring c
 
 ## Model artifact
 
-The exported model is stored at `notebooks/models/sim_cost_isolation_forest.joblib`. The service loads this file by default. Set `MODEL_PATH` to override the location.
+The exported model is stored at `notebooks/models/sim_cost_isolation_forest.joblib`. The service loads this file by default. Set `MODEL_PATH` to override the location. The adjacent `sim_cost_model_metadata.json` supplies the model version and data classification; set `MODEL_METADATA_PATH` to override its location.
 
 The dependency file pins scikit-learn to version `1.6.1`, matching the version recorded in the model metadata.
+
+## Train or refresh the model
+
+From the repository root, install the ML dependencies and run the reproducible training pipeline:
+
+```bash
+python -m pip install -r src/ml-service/requirements.txt
+python notebooks/sim_cost_model.py
+```
+
+The pipeline writes the model and metadata under `notebooks/models/` and evaluation outputs under `notebooks/results/`. It generates synthetic data by default. Read [the ML experiment documentation](../../docs/ML_PROTOTYPE.md) before supplying any CSV.
 
 ## Run locally
 
@@ -63,4 +74,4 @@ Run the service tests:
 python -m pytest tests/ml-service -v
 ```
 
-The tests cover health reporting, normal and anomalous response handling, request validation, and unavailable-model handling. They use a deterministic stub model so the API behavior is tested independently of the exported model artifact. They do not measure the real model's predictive accuracy.
+The tests cover health reporting, model metadata reporting, normal and anomalous response handling, request validation, unavailable-model handling, and the reproducible training pipeline including model serialization. Stub-model API tests do not measure predictive accuracy. The training-pipeline tests verify artifact round-tripping and metadata generation, not real-world accuracy.
