@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Sim = {
@@ -142,14 +143,14 @@ export default function Home() {
         <div className="brand-lockup"><span className="brand-mark">S</span><div><strong>SIM Inventory</strong><small>ASSET CONTROL</small></div></div>
         <div className="workspace-label">WORKSPACE</div>
         <nav aria-label="Main navigation">
-          <a className="nav-item selected" href="#inventory"><span className="nav-symbol">▦</span> Inventory <span className="nav-count">{sims.length}</span></a>
-          <a className="nav-item" href="#overview"><span className="nav-symbol">◫</span> Overview</a>
-          <a className="nav-item" href="/employees"><span className="nav-symbol">♙</span> Employees</a>
-          <a className="nav-item" href="/allocations"><span className="nav-symbol">⇄</span> Allocations</a>
-          <a className="nav-item" href="/admin"><span className="nav-symbol">⚙</span> User administration</a>
-          <a className="nav-item" href="/audit"><span className="nav-symbol">≡</span> Audit log</a>
-          <a className="nav-item" href="/intelligence"><span className="nav-symbol">⌁</span> Asset intelligence</a>
-          <a className="nav-item" href="/reports"><span className="nav-symbol">▤</span> Reports</a>
+          <Link href="#inventory" className="nav-item selected"><span className="nav-symbol">▦</span> Inventory <span className="nav-count">{sims.length}</span></Link>
+          <Link href="#overview" className="nav-item"><span className="nav-symbol">◫</span> Overview</Link>
+          <Link href="/employees" className="nav-item"><span className="nav-symbol">♙</span> Employees</Link>
+          <Link href="/allocations" className="nav-item"><span className="nav-symbol">⇄</span> Allocations</Link>
+          <Link href="/admin" className="nav-item"><span className="nav-symbol">⚙</span> User administration</Link>
+          <Link href="/audit" className="nav-item"><span className="nav-symbol">≡</span> Audit log</Link>
+          <Link href="/intelligence" className="nav-item"><span className="nav-symbol">⌁</span> Asset intelligence</Link>
+          <Link href="/reports" className="nav-item"><span className="nav-symbol">▤</span> Reports</Link>
         </nav>
         <div className="sidebar-bottom"><span className="status-led" /> Development environment <small>Version 0.1.0</small></div>
       </aside>
