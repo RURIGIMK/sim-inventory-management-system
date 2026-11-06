@@ -44,6 +44,7 @@ def test_health_reports_loaded_model(client):
     assert response.json()["status"] == "ok"
     assert response.json()["model_loaded"] is True
     assert response.json()["model_error"] == ""
+    assert response.json()["model_version"] == ml_app.model_metadata.get("model_version", "unknown")
 
 
 def test_normal_cost_returns_inlier_prediction(client):
@@ -57,7 +58,8 @@ def test_normal_cost_returns_inlier_prediction(client):
     assert body["is_anomaly"] is False
     assert body["prediction"] == 1
     assert body["cost_ratio"] == pytest.approx(1500 / 1400)
-    assert body["model_version"] == "1.0.0"
+    assert body["model_version"] == ml_app.model_metadata.get("model_version", "unknown")
+    assert body["data_classification"] == ml_app.model_metadata.get("data_classification", "Unclassified model artifact")
 
 
 def test_high_cost_ratio_returns_anomaly_prediction(client):
