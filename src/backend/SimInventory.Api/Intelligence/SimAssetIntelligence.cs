@@ -85,7 +85,7 @@ public static class SimAssetIntelligence
                         "Review assignment history and resolve the duplicate active records."));
                 }
 
-                if (sim.Status != SimStatus.Allocated)
+                if (sim.Status != SimStatus.Allocated && sim.Status != SimStatus.Suspended)
                 {
                     alerts.Add(new SimAssetAlert(
                         "ASSIGNMENT_STATUS_MISMATCH", "high", "Assignment and SIM status disagree",
