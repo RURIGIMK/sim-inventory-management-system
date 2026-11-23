@@ -19,7 +19,8 @@ The deployed database is already provisioned. Production API startup therefore s
 - Production: leave `Database__InitializeOnStartup` unset or set it to `false`.
 - Local development: initialization defaults to enabled when `ASPNETCORE_ENVIRONMENT=Development`.
 - New empty database: initialize it deliberately in a controlled setup step before deploying with initialization disabled. Do not enable startup initialization against a database containing real organizational data.
-- The current prototype still uses `EnsureCreatedAsync` and idempotent SQL bootstrap statements for local setup. Reviewed EF Core migrations are required before production or real-data use.
+- Schema changes are versioned SQL scripts in `src/backend/SimInventory.Api/Data/Migrations`, applied in order by `dotnet SimInventory.Api.dll migrate` (the deploy workflow does this before triggering Render). Each script runs once in a transaction under an advisory lock; a checksum stops the run if an applied script was edited. `0001_baseline` adopts the schema that `EnsureCreated` produced, so the existing Neon database migrates in place.
+- `seed-demo` (manual `Demo data` workflow) migrates and then adds or refreshes synthetic demonstration data, including fictional employee names and ~17 months of labelled synthetic billing. It updates records in place and writes one audit event.
 
 Render Free services can sleep after inactivity and take time to wake. Removing repeated schema checks and demo seeding reduces application startup work, but it cannot eliminate the hosting platform's cold-start delay. A consistently warm service requires an instance plan that does not sleep.
 
@@ -51,6 +52,8 @@ Configure these variables in the Render service:
 - `Authentication__GoogleClientId`: Google Web OAuth client ID.
 - `Authentication__BootstrapAdminEmail`: first administrator's exact Google email.
 - `Cors__AllowedOrigins`: exact Cloudflare Pages origin, without a trailing slash.
+- `Integration__Token`: random secret of at least 32 characters, used by the scheduled ML pipeline, HR sync and audit anchor workflows (`X-Integration-Token`). Same value as the GitHub secret `SIM_INTEGRATION_TOKEN`.
+- Optional HR integration (see [HR_INTEGRATION.md](HR_INTEGRATION.md)): `Hr__WebhookSecret`, `Hr__DirectoryUrl`, `Hr__ApiKey`, `Hr__ApiKeyHeader`.
 
 No email provider or sender domain is required.
 
@@ -86,6 +89,8 @@ Secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `RENDER_DEPLOY_HOOK_URL`
+- `SIM_DB_CONNECTION_STRING`: Npgsql connection string for Neon, used only by the migration step and the `Demo data` workflow.
+- `SIM_INTEGRATION_TOKEN`: same value as `Integration__Token` on Render.
 
 Variables:
 
@@ -93,6 +98,7 @@ Variables:
 - `RENDER_API_BASE_URL`: the Render service's HTTPS URL.
 - `CLOUDFLARE_PAGES_PROJECT`: exact Pages project name.
 - `CORS_ALLOWED_ORIGINS`: exact Pages origin.
+- `ML_PIPELINE_ENABLED`, `HR_SYNC_ENABLED`, `AUDIT_ANCHOR_ENABLED`: set to `true` to turn on the nightly ML pipeline, the nightly HR pull and the daily audit anchor.
 
 The Render environment variables are configured in Render's dashboard, not copied into GitHub Actions. Keep Neon credentials and signing keys out of GitHub source code and frontend build variables.
 
@@ -100,7 +106,7 @@ The Render environment variables are configured in Render's dashboard, not copie
 
 1. A push or pull request runs CI: backend build/tests, frontend audit, type-check and build.
 2. Once configured, set `DEPLOY_ENABLED=true`.
-3. A push to `main` or manual workflow run triggers Render's deploy hook, builds the static frontend and waits up to 10 minutes for `/api/health` to return HTTP 200 before uploading the frontend. If the API does not become healthy, the workflow stops before the frontend deploy.
+3. A push to `main` or manual workflow run applies pending database migrations, then triggers Render's deploy hook, builds the static frontend and waits up to 10 minutes for `/api/health` to return HTTP 200 before uploading the frontend. If the API does not become healthy, the workflow stops before the frontend deploy.
 4. After the workflow succeeds, verify `https://YOUR-RENDER-SERVICE.onrender.com/api/health` and the Cloudflare Pages URL.
 
 ## Security and limitations

@@ -17,7 +17,13 @@ public sealed class Employee
     public string CostCentre { get; set; } = string.Empty;
     public EmploymentStatus Status { get; set; } = EmploymentStatus.Active;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? UpdatedAt { get; set; }
+
+    /// <summary>When the record was last confirmed by the HR source of truth.</summary>
+    public DateTimeOffset? LastSyncedAt { get; set; }
+
+    /// <summary>Where the record came from: seed, csv_import, hr_api or hr_webhook.</summary>
+    public string Source { get; set; } = "seed";
 }
 
-public sealed record CreateEmployeeRequest(string EmployeeNumber, string FullName, string? Email, string Department, string CostCentre);
-public sealed record UpdateEmployeeStatusRequest(EmploymentStatus Status);
+

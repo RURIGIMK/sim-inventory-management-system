@@ -52,6 +52,66 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ operator: "Safaricom", phoneNumber: "", iccid: "", planType: "Corporate voice + data", monthlyCost: "1500", costCentre: "" });
+  const [role, setRole] = useState("");
+  const [editing, setEditing] = useState<Sim | null>(null);
+  const [edit, setEdit] = useState({ operator: "", planType: "", monthlyCost: "", contractStart: "", contractEnd: "", costCentre: "" });
+  const [nextStatus, setNextStatus] = useState("Suspended");
+  const [statusReason, setStatusReason] = useState("");
+  const isAdmin = role === "Administrator";
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("simAccessToken");
+    if (!token) return;
+    fetch(API + "/api/auth/me", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+      .then(r => r.ok ? r.json() : null).then(me => setRole(me?.role ?? "")).catch(() => setRole(""));
+  }, []);
+
+  function openEditor(sim: Sim) {
+    setEditing(sim);
+    setEdit({
+      operator: sim.operator, planType: sim.planType, monthlyCost: String(sim.monthlyCost),
+      contractStart: sim.contractStart ?? "", contractEnd: sim.contractEnd ?? "", costCentre: sim.costCentre
+    });
+    setNextStatus(sim.status === "Suspended" ? "Available" : "Suspended");
+    setStatusReason("");
+    setNotice("");
+  }
+
+  async function send(path: string, method: string, body: unknown, success: string) {
+    setSaving(true);
+    try {
+      const response = await fetch(API + path, {
+        method, headers: { "Content-Type": "application/json", Authorization: "Bearer " + (sessionStorage.getItem("simAccessToken") || "") },
+        body: JSON.stringify(body)
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || (response.status === 403 ? "Only administrators can change SIM records." : "The change was not saved."));
+      setNotice(success);
+      setEditing(null);
+      await loadSims();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The change was not saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function saveDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    void send("/api/sims/" + editing.id, "PUT", {
+      operator: edit.operator, planType: edit.planType, monthlyCost: Number(edit.monthlyCost),
+      contractStart: edit.contractStart || null, contractEnd: edit.contractEnd || null, costCentre: edit.costCentre
+    }, "SIM details updated and recorded in the audit log.");
+  }
+
+  function changeStatus(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    if (nextStatus === "Deactivated" && !window.confirm("Deactivation is permanent. The SIM record is kept but can never be reactivated. Continue?")) return;
+    void send("/api/sims/" + editing.id + "/status", "POST", { status: nextStatus, reason: statusReason },
+      "SIM status changed to " + nextStatus + ".");
+  }
 
   const loadSims = useCallback(async () => {
     const token = typeof window !== "undefined" ? sessionStorage.getItem("simAccessToken") : null;
@@ -147,6 +207,7 @@ export default function Home() {
           <Link href="#overview" className="nav-item"><span className="nav-symbol">◫</span> Overview</Link>
           <Link href="/employees" className="nav-item"><span className="nav-symbol">♙</span> Employees</Link>
           <Link href="/allocations" className="nav-item"><span className="nav-symbol">⇄</span> Allocations</Link>
+          <Link href="/billing" className="nav-item"><span className="nav-symbol">₭</span> Billing</Link>
           <Link href="/admin" className="nav-item"><span className="nav-symbol">⚙</span> User administration</Link>
           <Link href="/audit" className="nav-item"><span className="nav-symbol">≡</span> Audit log</Link>
           <Link href="/intelligence" className="nav-item"><span className="nav-symbol">⌁</span> Asset intelligence</Link>
@@ -163,7 +224,7 @@ export default function Home() {
         <div className="content">
           <section className="page-heading" id="overview">
             <div><div className="eyebrow">ASSET MANAGEMENT / SIM REGISTER</div><h1>SIM inventory</h1><p>Track corporate SIM assets, review status and maintain clean inventory records.</p></div>
-            <button className="primary-button" disabled={mode !== "api"} onClick={() => { setShowForm(v => !v); setNotice(""); }}>{showForm ? "Close form" : <><span>＋</span> Register SIM</>}</button>
+            {isAdmin && <button className="primary-button" disabled={mode !== "api"} onClick={() => { setShowForm(v => !v); setNotice(""); }}>{showForm ? "Close form" : <><span>＋</span> Register SIM</>}</button>}
           </section>
 
           {notice && <div className="notice" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification">×</button></div>}
@@ -181,19 +242,41 @@ export default function Home() {
             </form>
           </section>}
 
+          {editing && <section className="form-panel">
+            <div className="panel-heading"><div><h2>Manage {editing.phoneNumber}</h2><p>Phone number and ICCID identify the SIM and cannot be edited. Every change is written to the audit log.</p></div><button className="text-button" onClick={() => setEditing(null)}>Close</button></div>
+            <form onSubmit={saveDetails} className="sim-form">
+              <label>Network operator<select value={edit.operator} onChange={e => setEdit({...edit, operator:e.target.value})}><option>Safaricom</option><option>Airtel</option><option>Telkom Kenya</option><option>Other</option></select></label>
+              <label>Plan type<input value={edit.planType} onChange={e => setEdit({...edit, planType:e.target.value})} required /></label>
+              <label>Contracted monthly cost (KES)<input type="number" min="0" step="0.01" value={edit.monthlyCost} onChange={e => setEdit({...edit, monthlyCost:e.target.value})} required /></label>
+              <label>Contract start<input type="date" value={edit.contractStart} onChange={e => setEdit({...edit, contractStart:e.target.value})} /></label>
+              <label>Contract end<input type="date" value={edit.contractEnd} onChange={e => setEdit({...edit, contractEnd:e.target.value})} /></label>
+              <label>Cost centre<input value={edit.costCentre} onChange={e => setEdit({...edit, costCentre:e.target.value})} required /></label>
+              <div className="form-actions"><button className="primary-button" type="submit" disabled={saving || editing.status === "Deactivated"}>{saving ? "Saving…" : "Save details"}</button></div>
+            </form>
+            <form onSubmit={changeStatus} className="sim-form">
+              <label>Change status<select value={nextStatus} onChange={e => setNextStatus(e.target.value)}>
+                <option value="Available">{editing.status === "Suspended" ? "Lift suspension" : "Available"}</option>
+                <option value="Suspended">Suspended (lost, damaged, under review)</option>
+                <option value="Deactivated">Deactivated (permanent)</option>
+              </select></label>
+              <label>Reason<input value={statusReason} onChange={e => setStatusReason(e.target.value)} placeholder="e.g. Reported lost by holder" minLength={3} required /></label>
+              <div className="form-actions"><button className="secondary-button" type="submit" disabled={saving || editing.status === "Deactivated"}>Apply status</button></div>
+            </form>
+          </section>}
+
           <section className="metrics" aria-label="Inventory summary">
             <article className="metric-card"><div className="metric-label">TOTAL SIMS <span className="metric-icon">▦</span></div><div className="metric-value">{sims.length}</div><div className="metric-foot">Records in current view</div></article>
             <article className="metric-card"><div className="metric-label">ALLOCATED <span className="metric-icon red">↗</span></div><div className="metric-value">{activeCount}</div><div className="metric-foot">Currently assigned</div></article>
             <article className="metric-card"><div className="metric-label">AVAILABLE <span className="metric-icon">○</span></div><div className="metric-value">{availableCount}</div><div className="metric-foot">Ready for allocation</div></article>
-            <article className="metric-card"><div className="metric-label">MONTHLY COST <span className="metric-icon">KES</span></div><div className="metric-value cost">{totalMonthly.toLocaleString("en-KE", { maximumFractionDigits: 0 })}</div><div className="metric-foot">Across listed SIMs · KES</div></article>
+            <article className="metric-card"><div className="metric-label">MONTHLY COST <span className="metric-icon">KES</span></div><div className="metric-value cost">{totalMonthly.toLocaleString("en-KE", { maximumFractionDigits: 0 })}</div><div className="metric-foot">Contracted, across listed SIMs · KES</div></article>
           </section>
 
           <section className="inventory-panel" id="inventory">
             <div className="panel-heading"><div><h2>SIM records</h2><p>Inventory details and current status</p></div><button className="text-button" onClick={() => void loadSims()}>↻ Refresh</button></div>
             <div className="table-toolbar"><div className="search-wrap"><span>⌕</span><input aria-label="Search inventory" placeholder="Search operator, number, ICCID or cost centre" value={query} onChange={e => setQuery(e.target.value)} /></div><select className="filter-select" aria-label="Filter by status" value={status} onChange={e => setStatus(e.target.value)}><option>All statuses</option><option>Available</option><option>Allocated</option><option>Suspended</option><option>Deactivated</option></select></div>
-            <div className="table-scroll"><table><thead><tr><th>SIM / ICCID</th><th>OPERATOR</th><th>PLAN TYPE</th><th>COST CENTRE</th><th>MONTHLY COST</th><th>STATUS</th></tr></thead><tbody>
-              {filtered.map(sim => <tr key={sim.id}><td><div className="sim-primary">{sim.phoneNumber}</div><div className="sim-secondary">ICCID {sim.iccid}</div></td><td><span className="operator-dot">{sim.operator.slice(0,1)}</span>{sim.operator}</td><td>{sim.planType}</td><td><span className="cost-centre">{sim.costCentre}</span></td><td className="money">{Number(sim.monthlyCost).toLocaleString("en-KE", {style:"currency",currency:"KES",maximumFractionDigits:0})}</td><td><span className={"status-pill " + sim.status.toLowerCase()}><i />{sim.status}</span></td></tr>)}
-              {filtered.length === 0 && <tr><td colSpan={6} className="empty-state">No SIM records match these filters.</td></tr>}
+            <div className="table-scroll"><table><thead><tr><th>SIM / ICCID</th><th>OPERATOR</th><th>PLAN TYPE</th><th>COST CENTRE</th><th>MONTHLY COST</th><th>STATUS</th>{isAdmin && <th />}</tr></thead><tbody>
+              {filtered.map(sim => <tr key={sim.id}><td><div className="sim-primary">{sim.phoneNumber}</div><div className="sim-secondary">ICCID {sim.iccid}</div></td><td><span className="operator-dot">{sim.operator.slice(0,1)}</span>{sim.operator}</td><td>{sim.planType}</td><td><span className="cost-centre">{sim.costCentre}</span></td><td className="money">{Number(sim.monthlyCost).toLocaleString("en-KE", {style:"currency",currency:"KES",maximumFractionDigits:0})}</td><td><span className={"status-pill " + sim.status.toLowerCase()}><i />{sim.status}</span></td>{isAdmin && <td><button className="text-button" onClick={() => openEditor(sim)} disabled={sim.status === "Deactivated"}>Manage</button></td>}</tr>)}
+              {filtered.length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="empty-state">No SIM records match these filters.</td></tr>}
             </tbody></table></div>
             <footer className="table-footer"><span>Showing <strong>{filtered.length}</strong> of <strong>{sims.length}</strong> records</span><span>{mode === "api" ? "Live database data" : mode === "loading" ? "Connecting to database" : "Database unavailable"}</span></footer>
           </section>

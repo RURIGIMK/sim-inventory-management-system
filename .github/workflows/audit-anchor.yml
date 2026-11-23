@@ -1,0 +1,51 @@
+name: Audit anchor
+
+# Records the head of the hash-linked audit chain outside the database, once a day, on the
+# `audit-anchors` branch. Someone with database access could rewrite events and recompute every
+# hash; they cannot rewrite these timestamped Git commits, so a recomputed chain no longer matches.
+on:
+  schedule:
+    - cron: "55 20 * * *"   # 23:55 Nairobi
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-anchor
+  cancel-in-progress: false
+
+jobs:
+  anchor:
+    if: ${{ vars.AUDIT_ANCHOR_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Read the chain head
+        env:
+          API: ${{ vars.RENDER_API_BASE_URL }}
+          TOKEN: ${{ secrets.SIM_INTEGRATION_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="${API%/}"
+          for i in $(seq 1 60); do curl -sf --max-time 10 "$api/api/health" >/dev/null && break; sleep 10; done
+          curl -sS --fail-with-body -H "X-Integration-Token: $TOKEN" "$api/api/integrations/audit/head" > head.json
+          python3 -c "import json;h=json.load(open('head.json'));print(json.dumps(h));assert h['chainValid'], 'audit chain verification failed'"
+      - name: Append to the audit-anchors branch
+        run: |
+          set -euo pipefail
+          git config user.name "audit-anchor[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin audit-anchors >/dev/null; then
+            git fetch --depth=1 origin audit-anchors && git checkout audit-anchors
+          else
+            git checkout --orphan audit-anchors && git rm -rf . >/dev/null
+            printf '# Audit chain anchors\n\nOne line per day: the audit chain head observed by the audit-anchor workflow.\n' > README.md
+          fi
+          python3 -c "import json;print(json.dumps(json.load(open('head.json')),separators=(',',':')))" >> anchors.jsonl
+          git add README.md anchors.jsonl
+          git commit -m "anchor: audit head $(date -u +%Y-%m-%d)"
+          git push origin audit-anchors

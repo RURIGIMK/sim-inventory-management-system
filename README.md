@@ -30,7 +30,11 @@ A web-based system for organizational SIM asset tracking, employee assignment, l
 - Hash-linked audit events, timestamp-stable SHA-256 verification, concurrent append serialization and an explicit recovery-checkpoint workflow for the known historical fork.
 - Explainable deterministic asset-intelligence rules for contract dates, inventory/assignment inconsistencies and unusually high same-operator costs.
 - Authenticated reporting dashboard for inventory status, monthly committed cost, operator and cost-centre breakdowns, contract dates and allocation history, with CSV export.
-- A synthetic-data Colab experiment and a separate FastAPI model-inference prototype. These are not yet connected to live application data or the Reports page.
+- SIM lifecycle management by administrators: edit commercial details, suspend, lift suspension, deactivate (terminal), with every change audited.
+- Departmental scoping: managers change custody only for employees in their own department.
+- HR directory integration (signed webhook push, scheduled pull, CSV export) with leaver detection. See [docs/HR_INTEGRATION.md](docs/HR_INTEGRATION.md).
+- Monthly billing history from operator invoices and an anomaly model connected to the live system: nightly retraining, time-ordered evaluation against the rule, administrator activation and rollback, and human reviews that become the evaluation labels. See [docs/ML_PIPELINE.md](docs/ML_PIPELINE.md).
+- Versioned SQL migrations, database-enforced append-only audit events and a daily external anchor of the audit chain head.
 
 ## Local development
 
@@ -69,13 +73,14 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 
 | Route | Purpose |
 | --- | --- |
-| `/` | SIM inventory, search, filtering and registration |
+| `/` | SIM inventory, search, filtering, registration, editing and status changes |
 | `/login` | Google sign-in |
-| `/employees` | Employee directory |
+| `/employees` | Employee directory and HR integration (sync, CSV import, run history, leavers holding SIMs) |
 | `/allocations` | SIM allocation, return and reassignment |
+| `/billing` | Operator invoice import and monthly billed-vs-contracted totals |
 | `/admin` | Account provisioning and role/status management |
 | `/audit` | Audit events, chain verification and recovery checkpoint |
-| `/intelligence` | Deterministic asset review flags |
+| `/intelligence` | Cost anomalies (rule and model side by side, reviews, model versions) and deterministic inventory checks |
 | `/reports` | Operational reports and CSV export |
 
 ## Core API routes
@@ -87,11 +92,22 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 | GET / POST | `/api/admin/users` | Administrator |
 | PUT | `/api/admin/users/{id}` | Administrator |
 | GET | `/api/employees` | Authenticated session |
-| GET / POST | `/api/sims` | Authenticated read / manager or administrator write |
+| GET / POST | `/api/sims` | Authenticated read / administrator write |
+| PUT | `/api/sims/{id}` | Administrator: edit commercial details |
+| POST | `/api/sims/{id}/status` | Administrator: suspend, lift suspension, deactivate |
+| GET | `/api/sims/{id}/costs` | Authenticated session |
 | GET / POST | `/api/allocations` | Authenticated read / manager or administrator write |
 | POST | `/api/allocations/{id}/return` | Manager or administrator |
 | POST | `/api/allocations/{id}/reassign` | Manager or administrator |
-| GET | `/api/admin/audit` | Administrator |
+| POST | `/api/admin/employees/import` · `/sync` · GET `/sync-runs` | Administrator (HR CSV export, pull, history) |
+| POST | `/api/admin/billing/import` | Administrator (operator invoice CSV) |
+| GET | `/api/billing/summary` | Authenticated session |
+| GET | `/api/intelligence/anomalies` | Authenticated session |
+| POST | `/api/intelligence/reviews` | Administrator |
+| GET / POST | `/api/ml/models` · `/api/ml/models/{id}/activate` | Authenticated read / administrator activate |
+| * | `/api/integrations/ml/*`, `/api/integrations/hr/sync`, `/api/integrations/audit/head` | Integration token only |
+| POST | `/api/integrations/hr/employees` | HR system, HMAC-signed |
+| GET | `/api/admin/audit?beforeId=&take=` | Administrator (paged) |
 | GET | `/api/admin/audit/verify` | Administrator |
 | POST | `/api/admin/audit/recover` | Administrator |
 | GET | `/api/intelligence/alerts` | Authenticated session |
@@ -102,14 +118,14 @@ Requirements: .NET 8 SDK, Node.js 20+, npm and Docker.
 | Role | Access |
 | --- | --- |
 | Administrator | Provision accounts, manage inventory and allocations, view employees, reports and audit trail |
-| Departmental Manager | View employees and SIMs, register SIMs, allocate, return and reassign SIMs |
+| Departmental Manager | View employees and SIMs; allocate, return and reassign SIMs for employees in their own department |
 | Viewer | Read-only inventory, employee and allocation views |
 
 ## Data and ML limitations
 
-Only synthetic data belongs in this repository. The current SIM schema stores monthly cost, operator, plan type, cost centre, contract dates and status. It does not store invoice history, usage time series or a verified expected-cost field.
+Only synthetic data belongs in this repository. `Sims.MonthlyCost` is the contracted monthly fee; `SimCostRecords` holds billed amounts and usage per month. Demonstration billing is synthetic and labelled; employee names in the demonstration directory are fictional.
 
-The Colab notebook currently evaluates a model on synthetic records. Its reported metrics are not evidence of real-world predictive performance. The exported Isolation Forest model is a prototype and its separate FastAPI service is not yet deployed or called by the .NET API. The application intelligence page currently uses deterministic rules, not ML predictions.
+Model metrics computed on synthetic scenarios describe the generator, not real billing. Once reviewers have confirmed or dismissed enough flags, the pipeline evaluates against those reviews instead.
 
 Before any organizational data is used, obtain written authorization, minimize the exported fields, remove employee identifiers and contact details, establish an approved expected-cost baseline, and define human review labels. Do not use predictions to automatically suspend a SIM or take employee/account action.
 
@@ -121,13 +137,12 @@ Render Free services can sleep after inactivity and take time to wake. Code opti
 
 ## Important limitations before production
 
-- Replace `EnsureCreated` and startup SQL bootstrap with reviewed, versioned EF Core migrations.
 - Add secure HttpOnly session cookies and complete an XSS/CSRF review.
 - Configure restricted database permissions, independent append-only audit archival, alerts and tested backups/restores.
-- Add full API integration and browser end-to-end tests.
+- Add browser end-to-end tests (API integration and pipeline end-to-end tests run in CI).
 - Establish approved data governance and privacy controls before using organizational records.
 - Do not describe hash-linked audit events as absolutely immutable.
-- Do not describe the synthetic ML experiment as a deployed or validated production model.
+- Do not describe model results on synthetic data as validated real-world performance.
 
 ## Documentation
 
@@ -135,6 +150,9 @@ Render Free services can sleep after inactivity and take time to wake. Code opti
 - [Security design](docs/SECURITY.md)
 - [Deployment and environment setup](docs/DEPLOYMENT.md)
 - [Reporting scope and interpretation](docs/REPORTING.md)
-- [ML prototype and limitations](docs/ML_PROTOTYPE.md)
+- [Billing history and the anomaly model loop](docs/ML_PIPELINE.md)
+- [HR directory integration](docs/HR_INTEGRATION.md)
+- [Original ML prototype](docs/ML_PROTOTYPE.md)
 - [Testing and evaluation plan](docs/TESTING.md)
-- [Colab notebook](notebooks/sim_cost_anomaly_demo.ipynb)
+- [Colab notebook connected to the live API](notebooks/sim_cost_pipeline_live.ipynb)
+- [Original Colab experiment](notebooks/sim_cost_anomaly_demo.ipynb)

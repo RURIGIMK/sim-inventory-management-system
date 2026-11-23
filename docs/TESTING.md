@@ -11,7 +11,12 @@ GitHub Actions runs:
 - xUnit tests in `tests/SimInventory.Api.Tests`.
 - Frontend dependency audit, TypeScript type-check and Next.js static build.
 
-The automated suite now covers basic model defaults, key EF Core schema invariants (unique SIM identifiers, one active assignment per SIM, restrictive foreign keys and cost precision), and deterministic SIM Asset Intelligence rules. The intelligence tests cover unusual-cost peer comparison, insufficient comparison data, contract expiry, allocated SIMs without active assignments and assignments linked to inactive employees. These are unit/schema tests; they do not prove Google sign-in, API role enforcement, database persistence, audit-chain verification or full frontend user journeys. A green CI result must not be presented as proof that those workflows have passed.
+Since the ML loop and HR integration work, CI also runs:
+- **API integration tests** (`tests/SimInventory.Api.Tests/Integration`) against a real PostgreSQL 16 container migrated with the production scripts: concurrent allocation of one SIM (exactly one succeeds), audit events recording real assignment IDs (D-07), role enforcement per endpoint (TC-03), department scoping, disabled accounts rejected with a still-valid token (TC-02), SIM lifecycle rules, duplicate identity → 409, all-or-nothing billing import, HR webhook signature and snapshot deactivation, the 30% deactivation safety stop, integration-token isolation, the model register → score → activate → review loop, append-only audit triggers, and migration idempotence.
+- **ML pipeline tests** (`tests/ml-pipeline`): no label leakage, no look-ahead in features, safe artifact loading, time-ordered evaluation, review labels replacing synthetic labels, reasons on every flag.
+- **End-to-end job**: migrate and seed twice, start the API, run the real pipeline against it, push a signed HR change, verify the audit chain head and that audit deletion fails.
+
+The original unit suite covers basic model defaults, key EF Core schema invariants (unique SIM identifiers, one active assignment per SIM, restrictive foreign keys and cost precision), and deterministic SIM Asset Intelligence rules. The intelligence tests cover unusual-cost peer comparison, insufficient comparison data, contract expiry, allocated SIMs without active assignments and assignments linked to inactive employees. These are unit/schema tests; they do not prove Google sign-in, API role enforcement, database persistence, audit-chain verification or full frontend user journeys. A green CI result must not be presented as proof that those workflows have passed.
 
 Run backend tests from the repository root:
 

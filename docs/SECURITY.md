@@ -16,11 +16,17 @@
 
 | Role | Access |
 | --- | --- |
-| Administrator | User administration, SIM inventory management and audit-log review |
-| Departmental Manager | Read inventory and register SIMs |
-| Viewer | Read-only inventory access |
+| Administrator | User administration, SIM registration, editing and status changes, billing import, HR directory sync, anomaly reviews, model activation, audit trail |
+| Departmental Manager | Allocate, return and reassign SIMs for employees in their own department only; read inventory, employees, reports and intelligence |
+| Viewer | Read-only inventory, employee, allocation, billing and intelligence views |
 
-Expand this matrix as allocation approvals, reporting and employee management are implemented. Default new accounts to Viewer.
+A Departmental Manager must have a department. Scoping is enforced in the API for every custody action (including both sides of a reassignment), not only in the interface. Default new accounts to Viewer.
+
+## Machine-to-machine access
+
+- Scheduled jobs (ML pipeline, HR pull, audit anchor) present `X-Integration-Token`, compared in constant time. The token unlocks only `/api/integrations/*`; it cannot reach user, SIM or custody routes, and user sessions cannot reach integration routes. Integration routes are rate limited.
+- HR pushes are authenticated by HMAC-SHA256 over timestamp and body with a five-minute replay window.
+- The ML pipeline receives no names, phone numbers, ICCIDs or emails. Model artifacts are loaded with `skops`, which refuses unexpected types, and are checksum-verified.
 
 ## Session signing and account access
 
@@ -33,7 +39,7 @@ Expand this matrix as allocation approvals, reporting and employee management ar
 
 State-changing actions write an audit event containing actor, action, affected entity, timestamp, details, previous hash and SHA-256 hash. The chain is tamper-evident: changing an event breaks subsequent verification. It is not absolute immutability. A database owner who can rewrite all records and hashes could reconstruct the chain.
 
-Before production, strengthen the design with database roles that deny application-level update/delete on audit rows, a verification job, independent append-only/WORM archival or signed external checkpoints, alerting, and tested retention. Blockchain is not required for this prototype; it would add operational complexity without replacing access control, backups or governance.
+Implemented hardening: database triggers reject UPDATE, DELETE and TRUNCATE on `AuditEvents` for every role (migration `0003`), and the `audit-anchor` workflow records the verified chain head daily on the `audit-anchors` Git branch, so a history rewritten and re-hashed inside the database no longer matches the external record. Remaining before production: a separate least-privilege database role for the API (so it could not drop the triggers), independent WORM archival, alerting and tested retention. Blockchain is not required for this prototype; it would add operational complexity without replacing access control, backups or governance.
 
 ## Data and privacy
 
