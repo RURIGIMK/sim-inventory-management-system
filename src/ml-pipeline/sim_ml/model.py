@@ -71,7 +71,14 @@ def explain(bundle: Bundle, row: pd.Series, top: int = 2) -> list[str]:
     values = row[bundle.features].astype(float).to_numpy()
     z = np.abs((values - bundle.median) / bundle.scale)
     reasons: list[str] = []
+    skip = set()
+    if row.get("zero_usage_streak", 0) > 0:
+        # Zero usage is clearer stated once than as two "0.0x usual" ratios.
+        reasons.append(_describe("zero_usage_streak", row))
+        skip = {"zero_usage", "zero_usage_streak", "log_data_vs_history", "log_voice_vs_history"}
     for index in np.argsort(-z):
+        if bundle.features[index] in skip:
+            continue
         if z[index] < 1.5 or len(reasons) >= top:
             break
         text = _describe(bundle.features[index], row)

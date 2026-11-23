@@ -28,8 +28,22 @@ jobs:
         run: dotnet restore src/backend/SimInventory.Api/SimInventory.Api.csproj
       - name: Build API
         run: dotnet build src/backend/SimInventory.Api/SimInventory.Api.csproj --configuration Release --no-restore
-      - name: Test
-        run: dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj --configuration Release
+      - name: Test (unit and PostgreSQL integration tests)
+        run: dotnet test tests/SimInventory.Api.Tests/SimInventory.Api.Tests.csproj --configuration Release --logger "trx;LogFileName=results.trx" --results-directory test-results
+      - name: Test summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          for path in glob.glob("test-results/*.trx"):
+              root = ET.parse(path).getroot()
+              c = root.find(".//t:Counters", ns).attrib
+              print(f"### .NET tests: {c['passed']} passed, {c['failed']} failed, {c['total']} total\n")
+              print("| Test | Outcome | Duration |\n|---|---|---|")
+              for r in sorted(root.findall(".//t:UnitTestResult", ns), key=lambda r: r.get("testName")):
+                  print(f"| {r.get('testName')} | {r.get('outcome')} | {r.get('duration', '')[:11]} |")
+          PY
 
 
   ml-service:
@@ -51,7 +65,10 @@ jobs:
       - name: Install ML pipeline dependencies
         run: python -m pip install -r src/ml-pipeline/requirements-dev.txt
       - name: Run ML pipeline tests
-        run: python -m pytest tests/ml-pipeline -v
+        run: |
+          set -o pipefail
+          python -m pytest tests/ml-pipeline -v | tee pipeline-tests.txt
+          echo "### ML pipeline tests: $(tail -n 1 pipeline-tests.txt)" >> "$GITHUB_STEP_SUMMARY"
 
   end-to-end:
     name: End-to-end (migrate, seed, API, ML pipeline, HR webhook)
