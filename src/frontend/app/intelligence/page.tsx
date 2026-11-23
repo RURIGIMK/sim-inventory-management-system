@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import CostAnomalies from "./CostAnomalies";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
 
@@ -34,6 +35,14 @@ export default function IntelligencePage() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("simAccessToken");
+    if (!token) return;
+    fetch(API + "/api/auth/me", { headers: { Authorization: "Bearer " + token }, cache: "no-store" })
+      .then(r => r.ok ? r.json() : null).then(me => setIsAdmin(me?.role === "Administrator")).catch(() => setIsAdmin(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,15 +83,17 @@ export default function IntelligencePage() {
         <Link href="/" className="back-link">← Inventory</Link>
         <p className="auth-eyebrow">ASSET INTELLIGENCE</p>
         <h1>SIM asset intelligence</h1>
-        <p>Explainable review flags for cost outliers, contract dates and inventory consistency.</p>
+        <p>Review flags for billing anomalies, contract dates and inventory consistency.</p>
       </div>
       <button className="text-button" onClick={() => { sessionStorage.removeItem("simAccessToken"); window.location.href = "/login"; }}>Sign out</button>
     </header>
 
     <section className="intelligence-note">
       <strong>How this works</strong>
-      <p>These are deterministic rules, not AI predictions. Every alert includes the condition that triggered it and a recommended human review. The system does not automatically disable SIMs or change account access.</p>
+      <p>Billing anomalies come from two sources shown side by side: a fixed rule and a machine-learning model retrained nightly on the billing history. The inventory checks further down are deterministic rules. Nothing here changes a record by itself: every flag waits for a person, and the system never disables SIMs or accounts automatically.</p>
     </section>
+
+    <CostAnomalies isAdmin={isAdmin} />
 
     {error && <p className="auth-error" role="alert">{error}</p>}
 
@@ -95,7 +106,7 @@ export default function IntelligencePage() {
         </section>
         <section className="admin-panel">
           <div className="audit-summary">
-            <div><h2>Review queue</h2><p>Evaluated on {result.evaluatedOn}. Review each flag against source records before acting.</p></div>
+            <div><h2>Inventory and contract checks</h2><p>Evaluated on {result.evaluatedOn}. Review each flag against source records before acting.</p></div>
             <button className="text-button" onClick={() => void load()}>Re-evaluate</button>
           </div>
           {result.alerts.length === 0 ?

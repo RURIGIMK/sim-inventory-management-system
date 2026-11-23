@@ -493,7 +493,7 @@ app.MapPost("/api/sims/{id:int}/status", async (int id, ChangeSimStatusRequest r
 
 app.MapGet("/api/employees", async (SimInventoryDbContext db) =>
     Results.Ok(await db.Employees.AsNoTracking().OrderBy(x => x.EmployeeNumber)
-        .Select(x => new { x.Id, x.EmployeeNumber, x.FullName, x.Email, x.Department, x.CostCentre, status = x.Status.ToString() })
+        .Select(x => new { x.Id, x.EmployeeNumber, x.FullName, x.Email, x.Department, x.CostCentre, status = x.Status.ToString(), x.Source, x.LastSyncedAt })
         .ToListAsync())).RequireAuthorization("Session");
 
 app.MapGet("/api/allocations", async (SimInventoryDbContext db) =>

@@ -13,6 +13,8 @@ export default function AuditPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [recovering, setRecovering] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const request = useCallback(async (path: string) => {
     const token = sessionStorage.getItem("simAccessToken");
     if (!token) { window.location.href = "/login"; throw new Error("Sign in required."); }
@@ -22,7 +24,7 @@ export default function AuditPage() {
     setLoading(true); setError("");
     try {
       const [response, check] = await Promise.all([
-        request("/api/admin/audit"),
+        request("/api/admin/audit?take=100"),
         request("/api/admin/audit/verify")
       ]);
       if (!response.ok) throw new Error(response.status === 403 ? "Administrator access is required to view the audit trail." : "Could not load audit events.");
@@ -31,10 +33,24 @@ export default function AuditPage() {
         : "Audit records loaded, but chain verification could not be completed.");
       const [auditData, verificationData] = await Promise.all([response.json(), check.json()]);
       setEvents(auditData as AuditEvent[]);
+      setHasMore((auditData as AuditEvent[]).length === 100);
       setVerification(verificationData as Verification);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load audit trail."); }
     finally { setLoading(false); }
   }, [request]);
+  const loadOlder = useCallback(async () => {
+    const oldest = events[events.length - 1];
+    if (!oldest) return;
+    setLoadingOlder(true);
+    try {
+      const response = await request(`/api/admin/audit?take=100&beforeId=${oldest.id}`);
+      if (!response.ok) throw new Error("Could not load older audit events.");
+      const older = await response.json() as AuditEvent[];
+      setEvents(current => [...current, ...older]);
+      setHasMore(older.length === 100);
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not load older audit events."); }
+    finally { setLoadingOlder(false); }
+  }, [events, request]);
   const recover = useCallback(async () => {
     if (!window.confirm("Record a recovery checkpoint for the detected historical fork? Existing audit events will not be changed or deleted.")) return;
     setRecovering(true); setError("");
@@ -62,8 +78,8 @@ export default function AuditPage() {
       {verification && <p className={verification.valid ? "admin-notice" : "auth-error"} role="status">{verification.status === "recovered_with_historical_fork" ? `Recovery verified. Events ${verification.historicalFork?.firstForkEventId} and ${verification.historicalFork?.secondForkEventId} remain recorded as a historical fork. The new chain is valid from recovery event ${verification.recoveryEventId}.` : verification.valid ? `Verified ${verification.checkedEvents} audit events. No broken hash links detected.` : `Verification failed at event ${verification.firstInvalidEventId}. The historical chain requires investigation.`}</p>}
       {loading ? <p className="admin-footnote">Loading audit records…</p> : <div className="admin-table-wrap"><table className="admin-table audit-table"><thead><tr><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th><th>Hash</th></tr></thead><tbody>
         {events.map(event => <tr key={event.id}><td>{new Date(event.createdAt).toLocaleString("en-GB", { timeZone: "UTC", dateStyle: "medium", timeStyle: "medium" })}</td><td>{event.actorEmail}</td><td><strong>{event.action}</strong></td><td>{event.entityType} · {event.entityId}</td><td><code>{event.details}</code></td><td><code title={event.hash}>{event.hash.slice(0, 14)}…</code></td></tr>)}
-      </tbody></table></div>}
+      </tbody></table>{hasMore && <button className="text-button" onClick={() => void loadOlder()} disabled={loadingOlder}>{loadingOlder ? "Loading…" : "Load older events"}</button>}</div>}
     </section>
-    <p className="admin-footnote">Times are displayed in UTC. The table shows the latest 500 events; verification checks the complete stored chain. Hash linking is tamper-evident, not absolute immutability.</p>
+    <p className="admin-footnote">Times are displayed in UTC. Events load 100 at a time; verification always checks the complete stored chain. The database rejects any update or deletion of audit events, and the chain head is recorded daily outside the database (audit-anchors branch), so a rewritten history would no longer match. Hash linking is tamper-evident, not absolute immutability.</p>
   </main>;
 }

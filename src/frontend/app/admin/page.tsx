@@ -4,13 +4,15 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5080").replace(/\/$/, "");
-type User = { id: string; email: string; displayName: string; role: "Administrator" | "DepartmentalManager" | "Viewer"; isActive: boolean; createdAt: string };
+type User = { id: string; email: string; displayName: string; role: "Administrator" | "DepartmentalManager" | "Viewer"; isActive: boolean; createdAt: string; department?: string | null };
+const DEPARTMENTS = ["Operations", "Finance", "Human Resources", "Information Technology", "Procurement", "Customer Service"];
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<User["role"]>("Viewer");
+  const [department, setDepartment] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,23 +44,23 @@ export default function AdminUsersPage() {
     try {
       const response = await fetch(API + "/api/admin/users", {
         method: "POST", headers: authHeaders(),
-        body: JSON.stringify({ email, displayName, role })
+        body: JSON.stringify({ email, displayName, role, department: department || null })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.message || "Could not create account.");
-      setEmail(""); setDisplayName(""); setRole("Viewer");
+      setEmail(""); setDisplayName(""); setRole("Viewer"); setDepartment("");
       setNotice("Account approved. The user can sign in with this exact Google email.");
       await loadUsers();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create account."); }
     finally { setBusy(false); }
   }
 
-  async function updateUser(user: User, nextRole: User["role"], nextActive: boolean) {
+  async function updateUser(user: User, nextRole: User["role"], nextActive: boolean, nextDepartment?: string) {
     setError(""); setNotice("");
     try {
       const response = await fetch(API + "/api/admin/users/" + user.id, {
         method: "PUT", headers: authHeaders(),
-        body: JSON.stringify({ role: nextRole, isActive: nextActive })
+        body: JSON.stringify({ role: nextRole, isActive: nextActive, department: nextDepartment ?? user.department ?? "" })
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.message || "Could not update account.");
@@ -80,20 +82,22 @@ export default function AdminUsersPage() {
         <label>Full name<input value={displayName} onChange={e => setDisplayName(e.target.value)} required /></label>
         <label>Google account email<input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label>
         <label>Role<select value={role} onChange={e => setRole(e.target.value as User["role"])}><option value="Viewer">Viewer</option><option value="DepartmentalManager">Departmental Manager</option><option value="Administrator">Administrator</option></select></label>
+        <label>Department{role === "DepartmentalManager" ? " (required)" : ""}<select value={department} onChange={e => setDepartment(e.target.value)} required={role === "DepartmentalManager"}><option value="">None</option>{DEPARTMENTS.map(d => <option key={d}>{d}</option>)}</select></label>
         <button className="primary-button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create account"}</button>
       </form>
     </section>
     <section className="admin-panel">
       <h2>Existing accounts</h2>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Department</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>{users.map(user => <tr key={user.id}>
           <td><strong>{user.displayName}</strong><small>{user.email}</small></td>
           <td><select aria-label={"Role for " + user.email} value={user.role} onChange={e => void updateUser(user, e.target.value as User["role"], user.isActive)}><option value="Viewer">Viewer</option><option value="DepartmentalManager">Departmental Manager</option><option value="Administrator">Administrator</option></select></td>
+          <td><select aria-label={"Department for " + user.email} value={user.department ?? ""} onChange={e => void updateUser(user, user.role, user.isActive, e.target.value)}><option value="">None</option>{DEPARTMENTS.map(d => <option key={d}>{d}</option>)}</select></td>
           <td><span className={user.isActive ? "account-active" : "account-disabled"}>{user.isActive ? "Active" : "Disabled"}</span></td>
           <td><button className="text-button" onClick={() => void updateUser(user, user.role, !user.isActive)}>{user.isActive ? "Disable" : "Enable"}</button></td>
         </tr>)}</tbody>
       </table></div>
     </section>
-    <p className="admin-footnote">Account changes are recorded in the append-only, hash-linked audit log. Disabled users are rejected by the API, including when they still hold a previously issued token.</p>
+    <p className="admin-footnote">Account changes are recorded in the append-only, hash-linked audit log. Disabled users are rejected by the API, including when they still hold a previously issued token. Departmental Managers can allocate, return and reassign SIMs only for employees in their own department.</p>
   </main>;
 }
