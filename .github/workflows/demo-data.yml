@@ -1,0 +1,28 @@
+name: Demo data
+
+# Manual only. Applies migrations, then adds or refreshes the synthetic demonstration data:
+# realistic but fictional employee names, demo SIMs and ~17 months of labelled synthetic billing.
+# Existing records are updated in place, never deleted, and the run is written to the audit log.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type SYNTHETIC to confirm this database is a demonstration database"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    if: ${{ inputs.confirm == 'SYNTHETIC' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Migrate and seed
+        env:
+          ConnectionStrings__DefaultConnection: ${{ secrets.SIM_DB_CONNECTION_STRING }}
+        run: dotnet run --configuration Release --project src/backend/SimInventory.Api -- seed-demo

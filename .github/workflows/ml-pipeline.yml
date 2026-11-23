@@ -1,0 +1,51 @@
+name: ML pipeline
+
+# Nightly: read billing history from the API, evaluate a candidate model against the rule and the
+# active model on months it has not seen, register it as a candidate and publish scores.
+# It never activates a model: an administrator does that from the Intelligence page.
+on:
+  schedule:
+    - cron: "40 0 * * *"   # 03:40 Nairobi
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Evaluate only; register and publish nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ml-pipeline
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    if: ${{ vars.ML_PIPELINE_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: src/ml-pipeline/requirements.txt
+      - run: python -m pip install -r src/ml-pipeline/requirements.txt
+      - name: Run pipeline
+        working-directory: src/ml-pipeline
+        env:
+          SIM_API_BASE_URL: ${{ vars.RENDER_API_BASE_URL }}
+          SIM_INTEGRATION_TOKEN: ${{ secrets.SIM_INTEGRATION_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=(--summary-json run-summary.json)
+          if [ "${{ inputs.dry_run }}" = "true" ]; then args+=(--dry-run); fi
+          python -m sim_ml.run "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-run-summary
+          path: src/ml-pipeline/run-summary.json
+          if-no-files-found: ignore

@@ -1,0 +1,29 @@
+name: HR directory sync
+
+# Scheduled pull of the full employee directory from the HR system (Hr:DirectoryUrl on the API).
+# Complements the HR system's signed webhook pushes: a nightly full snapshot catches anything a push missed.
+on:
+  schedule:
+    - cron: "10 1 * * *"   # 04:10 Nairobi
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: ${{ vars.HR_SYNC_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wake the API and run the sync
+        env:
+          API: ${{ vars.RENDER_API_BASE_URL }}
+          TOKEN: ${{ secrets.SIM_INTEGRATION_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="${API%/}"
+          for i in $(seq 1 60); do curl -sf --max-time 10 "$api/api/health" >/dev/null && break; sleep 10; done
+          curl -sS --fail-with-body -X POST -H "X-Integration-Token: $TOKEN" "$api/api/integrations/hr/sync" | tee result.json
+          echo '### HR directory sync' >> "$GITHUB_STEP_SUMMARY"
+          python3 -c "import json;r=json.load(open('result.json'))['run'];print('| '+' | '.join(f'{k}: {r[k]}' for k in ['received','created','updated','deactivated','unchanged','rejected'])+' |')" >> "$GITHUB_STEP_SUMMARY"

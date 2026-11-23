@@ -51,6 +51,21 @@ jobs:
           npm run lint
           npm run build
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # Schema changes are applied before the new API version starts, so the running code never
+      # meets a schema older than it expects. Migrations are additive and idempotent.
+      - name: Apply database migrations
+        env:
+          ConnectionStrings__DefaultConnection: ${{ secrets.SIM_DB_CONNECTION_STRING }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ConnectionStrings__DefaultConnection" ]; then echo "Missing secret SIM_DB_CONNECTION_STRING" >&2; exit 1; fi
+          dotnet run --configuration Release --project src/backend/SimInventory.Api -- migrate
+
       - name: Trigger Render API deployment
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

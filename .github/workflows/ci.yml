@@ -48,6 +48,88 @@ jobs:
         run: python -m pip install -r src/ml-service/requirements-dev.txt
       - name: Run ML service tests
         run: python -m pytest tests/ml-service -v
+      - name: Install ML pipeline dependencies
+        run: python -m pip install -r src/ml-pipeline/requirements-dev.txt
+      - name: Run ML pipeline tests
+        run: python -m pytest tests/ml-pipeline -v
+
+  end-to-end:
+    name: End-to-end (migrate, seed, API, ML pipeline, HR webhook)
+    runs-on: ubuntu-latest
+    needs: [backend, ml-service]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: e2e-password
+          POSTGRES_DB: sim_inventory
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=sim_inventory;Username=postgres;Password=e2e-password
+      PGPASSWORD: e2e-password
+      Authentication__JwtSigningKey: e2e-signing-key-0123456789-abcdefghijklmnopqrstuvwxyz
+      Integration__Token: e2e-integration-token-0123456789abcdefghijklmnop
+      Hr__WebhookSecret: e2e-webhook-secret-0123456789abcdefghijklmnopq
+      SIM_INTEGRATION_TOKEN: e2e-integration-token-0123456789abcdefghijklmnop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build API
+        run: dotnet build src/backend/SimInventory.Api/SimInventory.Api.csproj --configuration Release
+      - name: Migrate and seed synthetic demo data (twice, to prove idempotence)
+        run: |
+          set -euo pipefail
+          dotnet run --no-build --configuration Release --project src/backend/SimInventory.Api -- seed-demo
+          dotnet run --no-build --configuration Release --project src/backend/SimInventory.Api -- seed-demo
+          psql -h localhost -U postgres -d sim_inventory -v ON_ERROR_STOP=1 -c "SELECT \"Id\" FROM \"__SchemaMigrations\" ORDER BY 1"
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"Employees\" WHERE \"EmployeeNumber\" LIKE 'EMP-%' AND \"FullName\" NOT LIKE 'Demo%'")" = "30"
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"SimCostRecords\" WHERE \"SyntheticScenario\" IS NOT NULL")" -gt 10
+      - name: Start API
+        run: |
+          set -euo pipefail
+          ASPNETCORE_URLS=http://127.0.0.1:5080 ASPNETCORE_ENVIRONMENT=Production \
+            nohup dotnet run --no-build --configuration Release --project src/backend/SimInventory.Api > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:5080/api/health && exit 0; sleep 2; done
+          cat api.log; exit 1
+      - name: Run the ML pipeline against the live API
+        run: |
+          set -euo pipefail
+          python -m pip install -r src/ml-pipeline/requirements.txt
+          cd src/ml-pipeline
+          python -m sim_ml.run --api-base http://127.0.0.1:5080 --summary-json ../../pipeline-summary.json
+          cd ../..
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"ModelVersions\" WHERE \"Status\" = 'candidate'")" = "1"
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"AnomalyScores\" WHERE \"IsFlagged\"")" -gt 0
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"AuditEvents\" WHERE \"Action\" IN ('ml_model_registered','ml_scores_published')")" = "2"
+      - name: Push an HR change through the signed webhook
+        run: |
+          set -euo pipefail
+          body='{"mode":"delta","employees":[{"employeeNumber":"EMP-10013","fullName":"Wanjiru Kamau","email":"wanjiru.kamau@staff.example","department":"Operations","costCentre":"OPS-014","status":"resigned"},{"employeeNumber":"EMP-99001","fullName":"Amani Kariuki","department":"Finance","costCentre":"FIN-021","status":"active"}]}'
+          ts=$(date +%s)
+          sig="sha256=$(printf '%s.%s' "$ts" "$body" | openssl dgst -sha256 -hmac "$Hr__WebhookSecret" -hex | sed 's/^.*= //')"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:5080/api/integrations/hr/employees -H 'Content-Type: application/json' -H "X-Hr-Timestamp: $ts" -H 'X-Hr-Signature: sha256=bad' -d "$body")
+          test "$code" = "401"
+          curl -sf -X POST http://127.0.0.1:5080/api/integrations/hr/employees -H 'Content-Type: application/json' -H "X-Hr-Timestamp: $ts" -H "X-Hr-Signature: $sig" -d "$body"
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT \"Status\" FROM \"Employees\" WHERE \"EmployeeNumber\" = 'EMP-10013'")" = "Terminated"
+          test "$(psql -h localhost -U postgres -d sim_inventory -tAc "SELECT count(*) FROM \"Employees\" WHERE \"EmployeeNumber\" = 'EMP-99001'")" = "1"
+      - name: Audit chain head and append-only guarantee
+        run: |
+          set -euo pipefail
+          curl -sf -H "X-Integration-Token: $Integration__Token" http://127.0.0.1:5080/api/integrations/audit/head | tee head.json
+          python -c "import json; h=json.load(open('head.json')); assert h['chainValid'], h"
+          if psql -h localhost -U postgres -d sim_inventory -c 'DELETE FROM "AuditEvents"'; then echo "audit delete should fail"; exit 1; fi
+      - name: Pipeline summary
+        if: always()
+        run: |
+          test -f pipeline-summary.json && cat pipeline-summary.json || true
+          tail -n 50 api.log || true
 
   frontend:
     name: Frontend type-check and static build
